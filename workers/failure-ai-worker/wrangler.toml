@@ -1,0 +1,22 @@
+name = "failure_ai_check_gateway"
+main = "./src/index.ts"
+compatibility_date = "2025-10-28"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets managed via Wrangler:
+# wrangler secret put SECRET_INTERNAL_KEY
+# wrangler secret put SECRET_CALLER_KEY (optional)
+# wrangler secret put GITHUB_TOKEN
+
+[env.production]
+name = "failure_ai_check_gateway"
+
+[env.production.vars]
+# Comma-separated list of allowed origins
+AI_GATEWAY_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173,https://ai-failure-chat.nodove.com"
+# Backend host to forward to
+AI_GATEWAY_BACKEND_HOST = "ai-serve.nodove.com"
+
+[[env.production.routes]]
+pattern = "ai-failure.nodove.com/*"
+zone_name = "nodove.com"
