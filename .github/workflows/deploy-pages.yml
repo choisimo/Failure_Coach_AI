@@ -45,6 +45,14 @@ jobs:
           VITE_AI_GATEWAY_URL: ${{ secrets.AI_GATEWAY_URL || 'https://ai-serve.nodove.com' }}
           VITE_AI_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_PUBLIC_KEY }}
 
+      - name: Bundle wiki docs
+        run: |
+          mkdir -p dist/wiki-docs
+          cp -r docs/* dist/wiki-docs/
+          if [ -f dist/wiki-docs/wiki-index.html ]; then
+            mv dist/wiki-docs/wiki-index.html dist/wiki-docs/index.html
+          fi
+
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v4
 
