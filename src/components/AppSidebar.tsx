@@ -14,6 +14,9 @@ import {
 } from "./ui/sidebar";
 import { Button } from "./ui/button";
 import { ConversationList, Conversation } from "./ConversationList";
+import { Switch } from "./ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useSettingsStore } from "@/hooks/useSettingsStore";
 
 interface AppSidebarProps {
   conversations: Conversation[];
@@ -30,6 +33,7 @@ export const AppSidebar = ({
 }: AppSidebarProps) => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { irlEnabled, irlPolicyVersion, setIrlEnabled, setIrlPolicyVersion } = useSettingsStore();
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-80"} collapsible="icon">
@@ -92,6 +96,34 @@ export const AppSidebar = ({
                 activeId={activeConversationId}
                 onSelect={onSelectConversation}
               />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {!collapsed && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">설정</SidebarGroupLabel>
+            <SidebarGroupContent className="p-3 pt-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">전문가 가이드</p>
+                  <p className="text-xs text-muted-foreground">IRL로 응답 재랭킹</p>
+                </div>
+                <Switch checked={irlEnabled} onCheckedChange={setIrlEnabled} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">정책 버전</label>
+                <Select value={irlPolicyVersion} onValueChange={setIrlPolicyVersion} disabled={!irlEnabled}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">자동</SelectItem>
+                    <SelectItem value="v1">v1</SelectItem>
+                    <SelectItem value="v2">v2</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

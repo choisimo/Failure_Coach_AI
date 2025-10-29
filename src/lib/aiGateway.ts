@@ -25,6 +25,15 @@ export interface GatewayResponse {
   raw: unknown;
 }
 
+export type GatewaySessionMessage = {
+  id?: string;
+  role?: "user" | "assistant" | "system";
+  content?: string;
+  noReply?: boolean;
+  metadata?: Record<string, unknown>;
+  parts?: Array<{ type?: string; text?: string }>;
+};
+
 // Cache session ids per conversation so we reuse server-side context
 const sessionCache = new Map<string, string>();
 
@@ -117,6 +126,24 @@ async function postMessage(sessionId: string, body: MessageBody, signal?: AbortS
   return data;
 }
 
+export async function getSessionMessages(sessionId: string, signal?: AbortSignal): Promise<GatewaySessionMessage[]> {
+  const endpoint = `${getGatewayUrl()}/session/${encodeURIComponent(sessionId)}/message`;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const apiKey = getGatewayKey();
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  const response = await fetch(endpoint, { method: "GET", headers, signal });
+  if (!response.ok) {
+    throw new Error(`Message list error: ${response.status} ${response.statusText}`);
+  }
+  const data = await response.json().catch(() => {
+    throw new Error("Message list API returned non-JSON response");
+  });
+
+  const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.messages) ? data.messages : Array.isArray(data?.data) ? data.data : [];
+  return list as GatewaySessionMessage[];
+}
+
 function extractReply(data: any): string | undefined {
   // Common shapes first
   if (typeof data?.reply === "string") return data.reply;
@@ -201,7 +228,7 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
           kind: "prompt",
           content: customSystemPrompt,
           noReply: true,
-          metadata: { source: "custom-mode-seed" },
+          metadata: { source: "custom-mode-seed", personaTitle, customSystemPrompt },
         }, signal);
       } catch (e) {
         // Rollback cache entry on seed failure
@@ -215,8 +242,12 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
     }
   }
 
-  // Send the actual user message
-  const messageData = await postMessage(sessionId!, { content: latestUser.content }, signal);
+  // Send the actual user message (include metadata for policy/IRL)
+  const messageData = await postMessage(
+    sessionId!,
+    { content: latestUser.content, metadata: meta },
+    signal
+  );
   const reply = extractReply(messageData);
 
   if (typeof reply !== "string" || !reply.trim()) {
@@ -227,4 +258,131 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
     reply: reply.trim(),
     raw: { sessionCreate: sessionCreateRaw, sessionId, message: messageData },
   };
+}
+
+// ---- Optional IRL helper APIs ----
+export interface IRLPolicyInfo {
+  id?: string;
+  version?: string;
+  label?: string;
+  description?: string;
+}
+
+export async function listPolicies(signal?: AbortSignal): Promise<IRLPolicyInfo[]> {
+  const endpoint = `${getGatewayUrl()}/irl/policies`;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const apiKey = getGatewayKey();
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const res = await fetch(endpoint, { headers, method: "GET", signal });
+  if (!res.ok) throw new Error(`Policies error: ${res.status} ${res.statusText}`);
+  const data = await res.json().catch(() => []);
+  const arr: any[] = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.policies)
+    ? data.policies
+    : Array.isArray(data?.data)
+    ? data.data
+    : [];
+  return arr.map((p) => ({
+    id: p?.id ?? p?.policyId ?? p?.name,
+    version: p?.version ?? p?.policyVersion,
+    label: p?.label ?? p?.title ?? p?.name,
+    description: p?.description ?? p?.details ?? undefined,
+  }));
+}
+
+export interface FeedbackEvent {
+  conversationId?: string;
+  sessionId?: string;
+  messageId?: string;
+  candidateId?: string;
+  action: string; // e.g., "like" | "unlike" | "regenerate" | "copy" | "save"
+  traceId?: string;
+  policyId?: string;
+  scores?: Record<string, unknown>;
+  comment?: string;
+}
+
+const getFeedbackPath = () => {
+  const configured = import.meta.env.VITE_IRL_FEEDBACK_PATH?.trim();
+  const path = configured && configured.length > 0 ? configured : "/v1/irl/feedback";
+  return path.startsWith("/") ? path : `/${path}`;
+};
+
+export async function sendFeedback(event: FeedbackEvent, signal?: AbortSignal): Promise<void> {
+  const endpoint = `${getGatewayUrl()}${getFeedbackPath()}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  const apiKey = getGatewayKey();
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const res = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(event), signal });
+  if (!res.ok) throw new Error(`Feedback error: ${res.status} ${res.statusText}`);
+}
+
+export type IRLMetadata = {
+  policyId?: string;
+  irlScore?: number;
+  safetyScore?: number;
+  rank?: number;
+  reason?: string;
+  traceId?: string;
+  candidateId?: string;
+  candidateSet?: any[];
+  [key: string]: any;
+};
+
+export function extractIRLMetadata(raw: unknown): IRLMetadata {
+  const r: any = raw || {};
+  const candidates: any[] = [];
+  // Ordered search for metadata across common shapes
+  const metaCandidate =
+    r?.metadata ||
+    r?.message?.metadata ||
+    r?.message?.data?.metadata ||
+    r?.data?.metadata ||
+    r?.metadata?.chosen ||
+    r?.message?.metadata?.chosen ||
+    undefined;
+
+  const m: any = (metaCandidate && typeof metaCandidate === "object") ? metaCandidate : {};
+  const chosen: any = m?.chosen && typeof m.chosen === "object" ? m.chosen : undefined;
+  const scores: any = m?.scores && typeof m.scores === "object" ? m.scores : chosen?.scores || {};
+
+  const pick = (obj: any, keys: string[]) => keys.map((k) => obj?.[k]).find((v) => v != null);
+
+  const result: IRLMetadata = {
+    policyId: pick(m, ["policyId", "policy_id"]) ?? pick(chosen || {}, ["policyId", "policy_id"]) ?? undefined,
+    irlScore: (pick(m, ["irlScore"]) ?? pick(scores, ["irl"]) ?? pick(chosen || {}, ["irlScore"])) as number | undefined,
+    safetyScore: (pick(m, ["safetyScore"]) ?? pick(scores, ["safety"]) ?? pick(chosen || {}, ["safetyScore"])) as number | undefined,
+    rank: (pick(m, ["rank"]) ?? pick(chosen || {}, ["rank"])) as number | undefined,
+    reason: (pick(m, ["reason"]) ?? pick(chosen || {}, ["reason"])) as string | undefined,
+    traceId: (pick(m, ["traceId", "trace_id", "traceID"]) ?? pick(chosen || {}, ["traceId", "trace_id", "traceID"])) as string | undefined,
+    candidateId: (pick(m, ["candidateId"]) ?? pick(chosen || {}, ["id", "candidateId"])) as string | undefined,
+    candidateSet: Array.isArray(m?.candidates) ? m.candidates : Array.isArray(r?.candidates) ? r.candidates : candidates,
+  };
+
+  return result;
+}
+
+export async function sendFeedbackReliable(event: FeedbackEvent, opts?: { onFinalFailure?: (err: unknown) => void }): Promise<void> {
+  const delays = [500, 1000, 2000];
+  let attempt = 0;
+  const tryOnce = async (): Promise<void> => {
+    try {
+      await sendFeedback(event);
+    } catch (err) {
+      if (attempt >= delays.length) {
+        console.warn("IRL feedback failed after retries", err);
+        opts?.onFinalFailure?.(err);
+        return;
+      }
+      const delay = delays[attempt++];
+      console.warn(`IRL feedback failed, retrying in ${delay}ms`, err);
+      await new Promise((res) => setTimeout(res, delay));
+      return tryOnce();
+    }
+  };
+  return tryOnce();
 }

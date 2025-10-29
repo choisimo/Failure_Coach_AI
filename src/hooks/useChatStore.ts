@@ -12,6 +12,7 @@ interface ChatState {
 
   addConversation: (opts?: { mode?: "GUIDED" | "CUSTOM"; customPrompt?: string; personaTitle?: string }) => string;
   addMessage: (conversationId: string, message: Omit<Message, "id" | "timestamp">) => void;
+  updateMessage: (conversationId: string, messageId: string, patch: Partial<Message>) => void;
   saveInsight: (conversationId: string, messageId: string) => void;
   deleteInsight: (insightId: string) => void;
   updateInsightNote: (insightId: string, note: string) => void;
@@ -19,6 +20,7 @@ interface ChatState {
   getActiveMessages: () => Message[];
   getActiveConversation: () => Conversation | undefined;
   setConversationSession: (conversationId: string, sessionId: string) => void;
+  updateConversation: (conversationId: string, patch: Partial<Conversation>) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -64,7 +66,6 @@ export const useChatStore = create<ChatState>()(
           const conversationMessages = state.messages[conversationId] || [];
           const updatedMessages = [...conversationMessages, fullMessage];
 
-          // Update conversation title and last message
           const updatedConversations = state.conversations.map((conv) => {
             if (conv.id === conversationId) {
               return {
@@ -82,6 +83,32 @@ export const useChatStore = create<ChatState>()(
 
           return {
             messages: { ...state.messages, [conversationId]: updatedMessages },
+            conversations: updatedConversations,
+          };
+        });
+      },
+
+      updateMessage: (conversationId, messageId, patch) => {
+        set((state) => {
+          const list = state.messages[conversationId] || [];
+          const updated = list.map((m) => (m.id === messageId ? { ...m, ...patch } : m));
+
+          // If the updated message is the last one, refresh lastMessage
+          const isLast = list[list.length - 1]?.id === messageId;
+          const lastContent = isLast ? (patch.content ?? list[list.length - 1]?.content) : undefined;
+
+          const updatedConversations = state.conversations.map((c) =>
+            c.id !== conversationId
+              ? c
+              : {
+                  ...c,
+                  lastMessage: lastContent != null ? String(lastContent).slice(0, 100) : c.lastMessage,
+                  timestamp: new Date(),
+                }
+          );
+
+          return {
+            messages: { ...state.messages, [conversationId]: updated },
             conversations: updatedConversations,
           };
         });
@@ -165,6 +192,14 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           conversations: state.conversations.map((c) =>
             c.id === conversationId ? { ...c, sessionId } : c
+          ),
+        }));
+      },
+
+      updateConversation: (conversationId, patch) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === conversationId ? { ...c, ...patch, timestamp: new Date() } : c
           ),
         }));
       },

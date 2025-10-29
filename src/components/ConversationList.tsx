@@ -28,7 +28,7 @@ export const ConversationList = ({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-3">
 
           {conversations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">
@@ -42,31 +42,37 @@ export const ConversationList = ({
                 key={conv.id}
                 onClick={() => onSelect(conv.id)}
                 className={cn(
-                  "w-full text-left rounded-xl transition-colors border",
+                  "w-full text-left rounded-2xl border transition-all",
                   "bg-card hover:bg-sidebar-accent border-border",
-                  "shadow-sm hover:shadow-md",
+                  "shadow-sm hover:shadow-lg hover:-translate-y-[1px]",
                   activeId === conv.id && "ring-2 ring-primary/40 border-primary/40"
                 )}
               >
                 <div className="p-3 flex items-start gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="h-4 w-4 text-primary" />
+                  <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <p className="text-sm font-semibold truncate">{conv.title}</p>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-tight truncate" title={conv.title}>
+                          {conv.title}
+                        </p>
+                        {conv.personaTitle && (
+                          <p className="text-[11px] text-muted-foreground truncate" title={conv.personaTitle}>
+                            {conv.personaTitle}
+                          </p>
+                        )}
+                      </div>
                       {conv.mode === "CUSTOM" && (
-                        <Badge variant="secondary" className="shrink-0">커스텀</Badge>
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">커스텀</Badge>
                       )}
                     </div>
-                    {conv.personaTitle && (
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{conv.personaTitle}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate mt-1">
-                      {conv.lastMessage}
+                    <p className="text-xs text-muted-foreground/90 mt-2 line-clamp-2 leading-relaxed" title={conv.lastMessage}>
+                      {conv.lastMessage || "대화가 시작되지 않았습니다."}
                     </p>
-                    <p className="text-[11px] text-muted-foreground/70 mt-1">
-                      {conv.timestamp.toLocaleDateString("ko-KR")}
+                    <p className="text-[11px] text-muted-foreground/70 mt-2">
+                      {conv.timestamp.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                     </p>
                   </div>
                 </div>

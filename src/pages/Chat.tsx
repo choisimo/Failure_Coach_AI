@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
+import type { Message } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
-import { requestGatewayCompletion } from "@/lib/aiGateway";
+import { requestGatewayCompletion, getSessionMessages, extractIRLMetadata, sendFeedbackReliable } from "@/lib/aiGateway";
+import { computeHistoryHash } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSettingsStore } from "@/hooks/useSettingsStore";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -18,16 +21,13 @@ const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 무엇이든 좋습니다. 최근에 겪은 일, 반복되는 고민, 혹은 막연한 불안... 어떤 것이든 환영합니다.`;
 
 export default function Chat() {
-  const {
-    activeConversationId,
-    getActiveMessages,
-    addMessage,
-    saveInsight,
-  } = useChatStore();
+  const { activeConversationId, getActiveMessages, addMessage, saveInsight } = useChatStore();
 
   const activeConversation = useChatStore((s) =>
     s.activeConversationId ? s.conversations.find((c) => c.id === s.activeConversationId) : undefined
   );
+
+  const { irlEnabled, irlPolicyVersion } = useSettingsStore();
 
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -36,22 +36,43 @@ export default function Chat() {
   const messages = getActiveMessages();
 
   useEffect(() => {
-    if (messages.length > 0) {
-      setShowWelcome(false);
-    }
+    if (messages.length > 0) setShowWelcome(false);
   }, [messages.length]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
   useEffect(() => {
-    if (activeConversation?.mode === "CUSTOM") {
-      setShowWelcome(false);
-    }
+    if (activeConversation?.mode === "CUSTOM") setShowWelcome(false);
   }, [activeConversation?.mode]);
+
+  // Rehydrate CUSTOM mode from existing session metadata
+  useEffect(() => {
+    const sessionId = activeConversation?.sessionId;
+    if (!sessionId || !activeConversation?.id) return;
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const list = await getSessionMessages(sessionId, controller.signal);
+        const first: any = Array.isArray(list) ? list[0] : undefined;
+        const metadata: any = (first && typeof first === "object" ? first.metadata : undefined) || {};
+        const isSeed = Boolean(first?.noReply) || metadata?.source === "custom-mode-seed";
+        if (isSeed) {
+          const patch: any = { mode: "CUSTOM" as const };
+          if (metadata?.personaTitle && !activeConversation?.personaTitle) patch.personaTitle = metadata.personaTitle;
+          if (metadata?.customSystemPrompt && !activeConversation?.customPrompt) patch.customPrompt = metadata.customSystemPrompt;
+          useChatStore.getState().updateConversation(activeConversation.id, patch);
+          setShowWelcome(false);
+        }
+      } catch {
+        // silent fail on rehydrate
+      }
+    })();
+
+    return () => controller.abort();
+  }, [activeConversation?.sessionId, activeConversation?.id]);
 
   const handleSend = async (content: string) => {
     if (!activeConversationId) return;
@@ -66,6 +87,8 @@ export default function Chat() {
     ];
 
     try {
+      const historyHash = await computeHistoryHash(history);
+      const candidates = 3;
       const { reply, raw } = await requestGatewayCompletion({
         messages: history,
         metadata: {
@@ -74,8 +97,14 @@ export default function Chat() {
           customSystemPrompt: activeConversation?.customPrompt,
           personaTitle: activeConversation?.personaTitle,
           sessionId: activeConversation?.sessionId,
+          irlEnabled,
+          irlPolicyVersion,
+          policyVersion: irlPolicyVersion,
+          candidates,
+          historyHash,
         },
       });
+
 
       // Persist sessionId after first creation
       const createdId = (raw as any)?.sessionId || (raw as any)?.sessionCreate?.id;
@@ -83,7 +112,22 @@ export default function Chat() {
         useChatStore.getState().setConversationSession(activeConversationId, createdId);
       }
 
-      addMessage(activeConversationId, { role: "assistant", content: reply });
+      const parsed = extractIRLMetadata(raw);
+      if (!parsed || (Object.values(parsed).every((v) => v == null))) {
+        console.warn("Missing IRL metadata", raw);
+      }
+      addMessage(activeConversationId, {
+        role: "assistant",
+        content: reply,
+        policyId: parsed.policyId,
+        irlScore: parsed.irlScore,
+        safetyScore: parsed.safetyScore,
+        rank: parsed.rank,
+        reason: parsed.reason,
+        traceId: parsed.traceId,
+        candidateId: parsed.candidateId,
+        candidateSet: Array.isArray(parsed.candidateSet) ? parsed.candidateSet : [],
+      });
     } catch (error) {
       console.error(error);
       toast({
@@ -102,15 +146,111 @@ export default function Chat() {
 
     const message = messages.find((m) => m.id === messageId);
     if (message?.saved) {
-      toast({
-        title: "저장 취소됨",
-        description: "통찰이 삭제되었습니다.",
-      });
+      toast({ title: "저장 취소됨", description: "통찰이 삭제되었습니다." });
     } else {
-      toast({
-        title: "통찰 저장됨",
-        description: "나의 통찰 페이지에서 확인하실 수 있습니다.",
+      toast({ title: "통찰 저장됨", description: "나의 통찰 페이지에서 확인하실 수 있습니다." });
+    }
+  };
+
+  const handleCopy = async (messageId: string) => {
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg) return;
+    try {
+      await navigator.clipboard.writeText(msg.content);
+      toast({ title: "복사됨", description: "메시지가 클립보드에 복사되었습니다." });
+    } catch {
+      toast({ title: "복사 실패", description: "복사 권한을 확인해주세요.", variant: "destructive" });
+    }
+  };
+
+  const handleLikeToggle = async (messageId: string) => {
+    if (!activeConversationId) return;
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg) return;
+    const next = !msg.liked;
+    useChatStore.getState().updateMessage(activeConversationId, messageId, { liked: next });
+
+      // Fire-and-forget feedback (non-blocking) with retry + warn
+      try {
+        const conv = activeConversation;
+        const traceId = msg.traceId;
+        const candidateId = msg.candidateId;
+        const policyId = msg.policyId;
+        const scores = {
+          irl: msg.irlScore,
+          safety: msg.safetyScore,
+          rank: msg.rank,
+        } as Record<string, unknown>;
+        await sendFeedbackReliable({
+          conversationId: activeConversationId,
+          sessionId: conv?.sessionId,
+          messageId,
+          candidateId,
+          action: next ? "like" : "unlike",
+          traceId,
+          policyId,
+          scores,
+        }, {
+          onFinalFailure: () => {
+            console.warn("IRL feedback permanently failed for message", { messageId, traceId, candidateId });
+            toast({ title: "피드백 전송 실패", description: "재시도에도 전송되지 않았습니다. 좋아요 상태는 유지됩니다.", variant: "destructive" });
+          }
+        });
+      } catch (err) {
+        console.warn("IRL feedback error", err);
+      }
+  };
+
+  const handleRegenerate = async (assistantMessageId: string) => {
+    if (!activeConversationId || isTyping) return;
+    const list = messages;
+    const idx = list.findIndex((m) => m.id === assistantMessageId);
+    if (idx === -1) return;
+
+    // Find the nearest previous user message before this assistant message
+    let lastUserIndex = -1;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (list[i].role === "user") {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    if (lastUserIndex === -1) return; // nothing to regenerate against
+
+    setIsTyping(true);
+
+    // Build history up to this assistant message
+    const slice = list.slice(0, idx); // up to but not including the assistant message
+    const history = slice.map((m) => ({ role: m.role, content: m.content })) as Array<{
+      role: Message["role"]; content: string;
+    }>;
+
+    try {
+      const historyHash = await computeHistoryHash(history);
+      const candidates = 3;
+      const { reply } = await requestGatewayCompletion({
+        messages: history,
+        metadata: {
+          conversationId: activeConversationId,
+          sessionMode: activeConversation?.mode,
+          customSystemPrompt: activeConversation?.customPrompt,
+          personaTitle: activeConversation?.personaTitle,
+          sessionId: activeConversation?.sessionId,
+          irlEnabled,
+          irlPolicyVersion,
+          policyVersion: irlPolicyVersion,
+          candidates,
+          historyHash,
+        },
       });
+
+      useChatStore.getState().updateMessage(activeConversationId, assistantMessageId, { content: reply });
+      toast({ title: "재생성 완료", description: "응답이 새로 고쳐졌습니다." });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "재생성 실패", description: "다시 시도해 주세요.", variant: "destructive" });
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -147,6 +287,16 @@ export default function Chat() {
               </TooltipContent>
             </Tooltip>
           )}
+          {irlEnabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="ml-2">전문가 가이드</Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
+                IRL 정책으로 응답을 재랭킹합니다.\n정책 버전: {irlPolicyVersion}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
 
@@ -165,7 +315,14 @@ export default function Chat() {
           )}
 
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} onSave={handleSaveInsight} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              onSave={handleSaveInsight}
+              onCopy={handleCopy}
+              onLikeToggle={handleLikeToggle}
+              onRegenerate={handleRegenerate}
+            />
           ))}
 
           {isTyping && <TypingIndicator />}
