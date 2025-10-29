@@ -41,6 +41,9 @@ jobs:
 
       - name: Build project
         run: npm run build
+        env:
+          VITE_AI_GATEWAY_URL: ${{ secrets.AI_GATEWAY_URL || 'https://ai-serve.nodove.com' }}
+          VITE_AI_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_PUBLIC_KEY }}
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v4
