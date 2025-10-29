@@ -1,4 +1,4 @@
-import { Sparkles, Star, MessageSquare } from "lucide-react";
+import { Sparkles, Star, MessageSquare, Plus } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "./ui/sidebar";
+import { Button } from "./ui/button";
 import { ConversationList, Conversation } from "./ConversationList";
 
 interface AppSidebarProps {
@@ -48,7 +49,7 @@ export const AppSidebar = ({
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>메뉴</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">메뉴</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -57,7 +58,7 @@ export const AppSidebar = ({
                     to="/"
                     end
                     className={({ isActive }) =>
-                      isActive ? "bg-sidebar-accent text-primary font-medium" : ""
+                      isActive ? "bg-sidebar-accent text-primary font-medium border-l-2 border-primary" : "hover:bg-sidebar-accent"
                     }
                   >
                     <MessageSquare className="h-4 w-4" />
@@ -70,7 +71,7 @@ export const AppSidebar = ({
                   <NavLink
                     to="/insights"
                     className={({ isActive }) =>
-                      isActive ? "bg-sidebar-accent text-primary font-medium" : ""
+                      isActive ? "bg-sidebar-accent text-primary font-medium border-l-2 border-primary" : "hover:bg-sidebar-accent"
                     }
                   >
                     <Star className="h-4 w-4" />
@@ -84,16 +85,24 @@ export const AppSidebar = ({
 
         {!collapsed && (
           <SidebarGroup className="flex-1">
-            <SidebarGroupLabel>대화 기록</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">대화 기록</SidebarGroupLabel>
             <SidebarGroupContent className="h-full">
               <ConversationList
                 conversations={conversations}
                 activeId={activeConversationId}
                 onSelect={onSelectConversation}
-                onNew={onNewConversation}
               />
             </SidebarGroupContent>
           </SidebarGroup>
+        )}
+
+        {/* Sticky footer new chat button */}
+        {!collapsed && (
+          <div className="p-3 border-t border-sidebar-border sticky bottom-0 bg-sidebar">
+            <Button onClick={onNewConversation} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="mr-2 h-4 w-4" /> 새 대화 시작
+            </Button>
+          </div>
         )}
       </SidebarContent>
     </Sidebar>

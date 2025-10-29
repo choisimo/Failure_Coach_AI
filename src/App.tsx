@@ -84,16 +84,17 @@ function AppContent() {
           </DialogHeader>
 
           {!mode && (
-            <div className="grid grid-cols-1 gap-3">
-              <Button className="justify-start" variant="default" onClick={startGuided}>
-                🧘‍♂️ 그림자 작업 시작하기
-              </Button>
-              <Button className="justify-start" variant="secondary" onClick={() => setMode("CUSTOM") }>
-                ✨ 새 페르소나 만들기
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                가이드: 실패 경험을 탐색하고 통찰을 얻는 대화. 커스텀: AI 역할을 직접 정의합니다.
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button onClick={startGuided} className="p-4 rounded-xl border border-border bg-card hover:bg-sidebar-accent text-left transition">
+                <div className="text-2xl mb-2">🧘‍♂️</div>
+                <h3 className="font-semibold">그림자 작업 시작하기</h3>
+                <p className="text-xs text-muted-foreground mt-1">실패 경험을 탐색하고 통찰을 얻는 가이드 대화</p>
+              </button>
+              <button onClick={() => setMode("CUSTOM")} className="p-4 rounded-xl border border-border bg-card hover:bg-sidebar-accent text-left transition">
+                <div className="text-2xl mb-2">✨</div>
+                <h3 className="font-semibold">새 페르소나 만들기</h3>
+                <p className="text-xs text-muted-foreground mt-1">AI 역할을 직접 정의해 대화를 맞춤화합니다</p>
+              </button>
             </div>
           )}
 
@@ -111,11 +112,15 @@ function AppContent() {
                 <label className="text-sm font-medium">시스템 프롬프트</label>
                 <Textarea
                   rows={8}
+                  maxLength={4000}
                   placeholder="예시: 당신은 5살 아이도 이해할 수 있도록 양자역학의 원리를 설명해주는 친절한 물리학자입니다..."
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground mt-1">최대 4000자 권장</p>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>최대 4000자 권장</span>
+                  <span>{customPrompt.length}/4000</span>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button onClick={() => setMode(null)} variant="ghost">뒤로</Button>
