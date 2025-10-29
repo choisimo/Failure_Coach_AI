@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { Message } from "@/components/ChatMessage";
 import { Conversation } from "@/components/ConversationList";
 import { Insight } from "@/components/InsightCard";
@@ -148,6 +148,19 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: "chat-storage",
+      storage: createJSONStorage(() => localStorage, {
+        reviver: (_key, value) => {
+          if (typeof value !== "string") return value;
+
+          const isoDatePattern =
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+          if (!isoDatePattern.test(value)) return value;
+
+          const parsed = new Date(value);
+          return Number.isNaN(parsed.getTime()) ? value : parsed;
+        },
+      }),
     }
   )
 );
