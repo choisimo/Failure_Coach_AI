@@ -46,6 +46,7 @@ jobs:
           VITE_AI_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_PUBLIC_KEY }}
 
       - name: Bundle wiki docs
+        if: ${{ hashFiles('docs/**') != '' }}
         run: |
           mkdir -p dist/wiki-docs
           cp -r docs/* dist/wiki-docs/

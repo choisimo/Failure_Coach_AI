@@ -1,0 +1,354 @@
+openapi: 3.1.0
+info:
+  title: IRL Hybrid Reranking & Observability API
+  version: 1.0.0
+  description: |
+    API contract for integrating IRL-based reranking, uncertainty-aware rejection,
+    policy management, and feedback telemetry with the Self Insight Chat gateway.
+servers:
+  - url: https://ai-serve.nodove.com/api
+    description: Production gateway
+  - url: https://staging.ai-serve.nodove.com/api
+    description: Staging gateway
+  - url: http://localhost:8787/api
+    description: Local development
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+      required: [role, content]
+    MetadataRequest:
+      type: object
+      description: Additional metadata used for reranking and caching.
+      properties:
+        conversationId:
+          type: string
+        sessionMode:
+          type: string
+          enum: [GUIDED, CUSTOM]
+        policyVersion:
+          type: string
+          example: v1
+        irlEnabled:
+          type: boolean
+          default: false
+        candidates:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        historyHash:
+          type: string
+          description: SHA-256 of trimmed prior turns for cache reuse.
+        sessionId:
+          type: string
+        personaTitle:
+          type: string
+        customSystemPrompt:
+          type: string
+      required: [conversationId, irlEnabled, policyVersion, candidates, historyHash]
+    ChatCompletionRequest:
+      type: object
+      required: [messages, metadata]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        metadata:
+          $ref: '#/components/schemas/MetadataRequest'
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        rank:
+          type: integer
+        irlScore:
+          type: number
+          format: float
+        safetyScore:
+          type: number
+          format: float
+        policyId:
+          type: string
+        reason:
+          type: string
+        uncertainty:
+          type: object
+          properties:
+            entropy:
+              type: number
+            temperature:
+              type: number
+      required: [id, text, rank]
+    MetadataResponse:
+      type: object
+      properties:
+        trace_id:
+          type: string
+        candidateCount:
+          type: integer
+        latency:
+          type: integer
+          description: Milliseconds from request to response.
+        chosen:
+          $ref: '#/components/schemas/Candidate'
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Candidate'
+        uncertainty:
+          type: object
+          properties:
+            entropy:
+              type: number
+            temperature:
+              type: number
+        fallbackReason:
+          type: string
+      required: [trace_id, candidateCount, latency, chosen]
+    ChatCompletionResponse:
+      type: object
+      required: [reply, metadata]
+      properties:
+        reply:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/MetadataResponse'
+    SessionCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [title]
+    SessionCreateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    SessionMessageRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          default: prompt
+        content:
+          type: string
+        noReply:
+          type: boolean
+          default: false
+        metadata:
+          type: object
+          additionalProperties: true
+        parts:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              text:
+                type: string
+      required: [content]
+    SessionMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    Policy:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        safetySummary:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+      required: [id, label]
+    FeedbackEvent:
+      type: object
+      properties:
+        traceId:
+          type: string
+        conversationId:
+          type: string
+        messageId:
+          type: string
+        candidateId:
+          type: string
+        action:
+          type: string
+          enum: [like, dislike, regenerate]
+        payload:
+          type: object
+          properties:
+            irlScore:
+              type: number
+            safetyScore:
+              type: number
+            rank:
+              type: integer
+            policyId:
+              type: string
+        timestamp:
+          type: string
+          format: date-time
+      required: [traceId, conversationId, messageId, action, timestamp]
+security:
+  - bearerAuth: []
+paths:
+  /v1/chat/completions:
+    post:
+      summary: Generate a chat completion with IRL reranking metadata.
+      operationId: createChatCompletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Successful response containing the chosen reply and metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+        '400':
+          description: Invalid request payload.
+        '401':
+          description: Authentication failed.
+        '503':
+          description: Upstream model unavailable or timed out.
+  /v1/irl/policies:
+    get:
+      summary: List available IRL policy versions and metadata.
+      operationId: listPolicies
+      responses:
+        '200':
+          description: Array of available policies.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Policy'
+        '401':
+          description: Authentication required.
+  /v1/irl/feedback:
+    post:
+      summary: Record user feedback for reranking evaluation.
+      operationId: createFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/FeedbackEvent'
+              required: [events]
+      responses:
+        '202':
+          description: Feedback batch accepted for asynchronous processing.
+        '400':
+          description: Invalid feedback payload.
+  /v1/session:
+    post:
+      summary: Create a new chat session
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreateRequest'
+      responses:
+        '201':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        '400':
+          description: Invalid request payload.
+  /v1/session/{sessionId}/message:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Post a message or seed prompt to a session.
+      operationId: postSessionMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionMessageRequest'
+      responses:
+        '200':
+          description: Message accepted; response stream or payload depends on provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionMessageResponse'
+    get:
+      summary: Retrieve messages for a session.
+      operationId: listSessionMessages
+      responses:
+        '200':
+          description: List of messages associated with the session.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SessionMessageResponse'
+        '404':
+          description: Session not found.
