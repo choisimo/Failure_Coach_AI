@@ -9,22 +9,26 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" />
     <style>
+      :root {
+        color-scheme: light dark;
+      }
       body {
         margin: 0;
         font-family: "Pretendard", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #f5f7fb;
-        color: #081029;
+        background: linear-gradient(135deg, #ecf2ff 0%, #f8fbff 40%, #ffffff 100%);
+        color: #0b1220;
         display: flex;
         min-height: 100vh;
       }
       aside {
-        width: 260px;
-        background: #0f172a;
-        color: white;
-        padding: 24px 16px;
+        width: 280px;
+        background: #101936;
+        color: #f8fafc;
+        padding: 28px 20px;
         display: flex;
         flex-direction: column;
         gap: 16px;
+        box-shadow: 4px 0 24px rgba(16, 25, 54, 0.28);
       }
       aside h1 {
         font-size: 1.25rem;
@@ -35,32 +39,74 @@
         flex-direction: column;
         gap: 4px;
       }
+      .nav-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
       nav a {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 10px 12px;
-        border-radius: 8px;
+        border-radius: 10px;
         color: inherit;
         text-decoration: none;
         font-size: 0.95rem;
-        transition: background 0.2s ease;
+        letter-spacing: -0.01em;
+        transition: background 0.2s ease, transform 0.15s ease;
       }
       nav a:hover {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.18);
+        transform: translateX(3px);
       }
       nav a.active {
-        background: rgba(14, 165, 233, 0.35);
+        background: linear-gradient(90deg, rgba(14, 165, 233, 0.55), rgba(59, 130, 246, 0.65));
         font-weight: 600;
+        color: white;
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.28);
       }
       nav small {
         font-size: 0.7rem;
-        opacity: 0.65;
+        opacity: 0.7;
+        margin-left: 12px;
+      }
+      .nav-sublist {
+        list-style: none;
+        margin: 0;
+        padding: 4px 0 4px 12px;
+        border-left: 1px solid rgba(148, 163, 184, 0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .nav-sublist a {
+        font-size: 0.82rem;
+        color: rgba(226, 232, 240, 0.82);
+        text-decoration: none;
+        padding: 4px 6px;
+        border-radius: 8px;
+        display: block;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+      .nav-sublist a:hover {
+        background: rgba(56, 189, 248, 0.12);
+        color: #e0f2fe;
+      }
+      .nav-sublist li.level-3 a {
+        padding-left: 18px;
+        font-size: 0.78rem;
+        opacity: 0.9;
+      }
+      .nav-sublist a.active-heading {
+        background: rgba(56, 189, 248, 0.25);
+        color: #f8fafc;
       }
       main {
         flex: 1;
-        padding: 32px;
+        padding: 48px 36px;
         overflow-y: auto;
+        backdrop-filter: blur(6px);
       }
       main h1 {
         margin-top: 0;
@@ -68,20 +114,21 @@
       .markdown-body {
         max-width: 960px;
         margin: 0 auto;
-        background: white;
-        padding: 32px;
-        border-radius: 16px;
-        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        background: rgba(255, 255, 255, 0.92);
+        padding: 40px 48px;
+        border-radius: 20px;
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
       }
       .badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
-        background: rgba(14, 165, 233, 0.12);
-        color: #e0f2fe;
+        padding: 6px 12px;
+        background: rgba(14, 165, 233, 0.18);
+        color: #0369a1;
         border-radius: 999px;
         font-size: 0.75rem;
+        font-weight: 600;
       }
       .search-box {
         position: relative;
@@ -90,12 +137,20 @@
       }
       .search-box input {
         width: 100%;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 12px 10px 34px;
-        background: rgba(255, 255, 255, 0.12);
-        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 10px;
+        padding: 10px 12px 10px 38px;
+        background: rgba(255, 255, 255, 0.18);
+        color: #f8fafc;
         outline: none;
+        transition: border 0.2s ease, background 0.2s ease;
+      }
+      .search-box input::placeholder {
+        color: rgba(248, 250, 252, 0.6);
+      }
+      .search-box input:focus {
+        border-color: rgba(56, 189, 248, 0.8);
+        background: rgba(56, 189, 248, 0.16);
       }
       .search-box svg {
         position: absolute;
@@ -107,9 +162,11 @@
       .toc {
         border-left: 4px solid rgba(14, 165, 233, 0.35);
         padding-left: 16px;
-        margin: 24px 0;
-        background: rgba(14, 165, 233, 0.08);
-        border-radius: 8px;
+        margin: 28px 0;
+        background: rgba(14, 165, 233, 0.12);
+        border-radius: 10px;
+        padding-top: 14px;
+        padding-bottom: 14px;
       }
       .toc h2 {
         margin-top: 0;
@@ -131,26 +188,28 @@
         text-decoration: underline;
       }
       #meta-panel {
-        background: rgba(15, 23, 42, 0.5);
-        border-radius: 12px;
-        padding: 14px 16px;
+        background: rgba(15, 23, 42, 0.44);
+        border-radius: 14px;
+        padding: 16px 18px;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
         font-size: 0.8rem;
+        border: 1px solid rgba(148, 163, 184, 0.25);
       }
       #meta-panel strong {
         font-weight: 600;
-        color: #bae6fd;
+        color: #f0f9ff;
       }
       details summary {
         cursor: pointer;
         font-weight: 600;
+        color: rgba(248, 250, 252, 0.85);
       }
       footer {
         margin-top: 24px;
-        font-size: 0.8rem;
-        color: rgba(8, 16, 41, 0.6);
+        font-size: 0.85rem;
+        color: rgba(8, 16, 41, 0.65);
       }
       @media (max-width: 768px) {
         body {
@@ -170,10 +229,10 @@
           white-space: nowrap;
         }
         main {
-          padding: 16px;
+          padding: 24px;
         }
         .markdown-body {
-          padding: 24px;
+          padding: 28px;
         }
       }
     </style>
@@ -200,7 +259,7 @@
         <summary>문서 목록</summary>
         <nav id="doc-nav"></nav>
       </details>
-      <a href="../" style="margin-top: auto; color: rgba(255,255,255,0.7); font-size: 0.85rem;">← 메인 앱으로 돌아가기</a>
+      <a href="../" style="margin-top: auto; color: rgba(226, 232, 240, 0.85); font-size: 0.85rem; text-decoration: none;">← 메인 앱으로 돌아가기</a>
     </aside>
     <main>
       <article class="markdown-body">
@@ -274,11 +333,18 @@
         }
       }
 
+      let currentFilterText = "";
+      let activeDocHeadings = [];
+
       function renderNav(filterText = "") {
+        currentFilterText = filterText;
         navEl.innerHTML = "";
         DOCS.filter((doc) => {
           return doc.title.toLowerCase().includes(filterText.toLowerCase());
         }).forEach((doc) => {
+          const item = document.createElement("div");
+          item.className = "nav-item";
+
           const link = document.createElement("a");
           if (doc.external) {
             link.href = `./${doc.file}`;
@@ -294,8 +360,34 @@
           link.append(titleSpan, cat);
           if (doc.file === activeDoc && !doc.external) {
             link.classList.add("active");
+            if (activeDocHeadings.length > 0) {
+              const subList = document.createElement("ul");
+              subList.className = "nav-sublist";
+              activeDocHeadings.forEach((heading) => {
+                const li = document.createElement("li");
+                li.className = `level-${heading.level}`;
+                const subLink = document.createElement("a");
+                subLink.href = `#${heading.id}`;
+                subLink.textContent = heading.text;
+                subLink.addEventListener("click", (event) => {
+                  event.preventDefault();
+                  const headingEl = document.getElementById(heading.id);
+                  if (headingEl) {
+                    headingEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                    setTimeout(() => {
+                      document.querySelectorAll(".nav-sublist a.active-heading").forEach((el) => el.classList.remove("active-heading"));
+                      subLink.classList.add("active-heading");
+                    }, 0);
+                  }
+                });
+                li.appendChild(subLink);
+                subList.appendChild(li);
+              });
+              item.appendChild(subList);
+            }
           }
-          navEl.appendChild(link);
+          item.prepend(link);
+          navEl.appendChild(item);
         });
       }
 
@@ -333,12 +425,22 @@
           metaTitleEl.textContent = meta?.title ?? file;
           metaUpdatedEl.textContent = updatedDate ? formatDate(updatedDate) : "-";
           buildTOC();
+          activeDocHeadings = Array.from(bodyEl.querySelectorAll("h2, h3"))
+            .filter((heading) => heading.id)
+            .map((heading) => ({
+              id: heading.id,
+              text: heading.textContent || heading.innerText || "",
+              level: Number(heading.tagName.replace("H", ""))
+            }));
+          renderNav(currentFilterText);
         } catch (error) {
           titleEl.textContent = "문서를 불러오는 중 오류 발생";
           bodyEl.textContent = error.message;
           metaTitleEl.textContent = "-";
           metaUpdatedEl.textContent = "-";
           tocEl.hidden = true;
+          activeDocHeadings = [];
+          renderNav(currentFilterText);
         }
       }
 
