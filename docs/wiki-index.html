@@ -282,7 +282,33 @@
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
     <script>
       const DOCS = [
-        { file: "irl-hybrid-spec.md", title: "IRL 하이브리드 재랭킹 및 관측성 스펙", category: "스펙" },
+        {
+          file: "irl-hybrid-spec.md",
+          title: "IRL 하이브리드 재랭킹 및 관측성 스펙",
+          category: "스펙",
+          headings: [
+            { id: "wiki-heading-irl-하이브리드-재랭킹-및-관측성-스펙", text: "IRL 하이브리드 재랭킹 및 관측성 스펙", level: 1 },
+            { id: "wiki-heading-1-개요", text: "1. 개요", level: 2 },
+            { id: "wiki-heading-2-이해관계자", text: "2. 이해관계자", level: 2 },
+            { id: "wiki-heading-3-기능-개요", text: "3. 기능 개요", level: 2 },
+            { id: "wiki-heading-4-세부-요구사항", text: "4. 세부 요구사항", level: 2 },
+            { id: "wiki-heading-41-클라이언트", text: "4.1 클라이언트", level: 3 },
+            { id: "wiki-heading-42-gateway서버", text: "4.2 Gateway/서버", level: 3 },
+            { id: "wiki-heading-43-텔레메트리--피드백", text: "4.3 텔레메트리 & 피드백", level: 3 },
+            { id: "wiki-heading-44-오프라인-평가", text: "4.4 오프라인 평가", level: 3 },
+            { id: "wiki-heading-5-비기능-요구사항", text: "5. 비기능 요구사항", level: 2 },
+            { id: "wiki-heading-6-qa--승인-기준", text: "6. QA & 승인 기준", level: 2 },
+            { id: "wiki-heading-7-릴리스-전략", text: "7. 릴리스 전략", level: 2 },
+            { id: "wiki-heading-8-관련-문서--산출물", text: "8. 관련 문서 & 산출물", level: 2 },
+            { id: "wiki-heading-9-핵심-수식-및-공식", text: "9. 핵심 수식 및 공식", level: 2 },
+            { id: "wiki-heading-91-하이브리드-재랭킹-점수", text: "9.1 하이브리드 재랭킹 점수", level: 3 },
+            { id: "wiki-heading-92-불확실성-추정", text: "9.2 불확실성 추정", level: 3 },
+            { id: "wiki-heading-93-안전-게이트", text: "9.3 안전 게이트", level: 3 },
+            { id: "wiki-heading-94-히스토리-해시", text: "9.4 히스토리 해시", level: 3 },
+            { id: "wiki-heading-95-품질-지표", text: "9.5 품질 지표", level: 3 },
+            { id: "wiki-heading-10-구현-진척-현황-2025-10-29", text: "10. 구현 진척 현황 (2025-10-29)", level: 2 }
+          ]
+        },
         { file: "irl-refactor-prd.md", title: "IRL 리팩토링 PRD", category: "프로젝트" },
         { file: "irl-hybrid-backlog.md", title: "IRL 하이브리드 백로그", category: "프로젝트" },
         { file: "telemetry/irl-telemetry-schema.md", title: "IRL 텔레메트리 스키마", category: "텔레메트리" },
@@ -360,10 +386,11 @@
           link.append(titleSpan, cat);
           if (doc.file === activeDoc && !doc.external) {
             link.classList.add("active");
-            if (activeDocHeadings.length > 0) {
+            const docHeadings = activeDocHeadings.length > 0 ? activeDocHeadings : doc.headings || [];
+            if (docHeadings.length > 0) {
               const subList = document.createElement("ul");
               subList.className = "nav-sublist";
-              activeDocHeadings.forEach((heading) => {
+              docHeadings.forEach((heading) => {
                 const li = document.createElement("li");
                 li.className = `level-${heading.level}`;
                 const subLink = document.createElement("a");
@@ -425,13 +452,17 @@
           metaTitleEl.textContent = meta?.title ?? file;
           metaUpdatedEl.textContent = updatedDate ? formatDate(updatedDate) : "-";
           buildTOC();
-          activeDocHeadings = Array.from(bodyEl.querySelectorAll("h2, h3"))
+          activeDocHeadings = Array.from(bodyEl.querySelectorAll("h1, h2, h3"))
             .filter((heading) => heading.id)
             .map((heading) => ({
               id: heading.id,
               text: heading.textContent || heading.innerText || "",
               level: Number(heading.tagName.replace("H", ""))
             }));
+          const doc = DOCS.find((d) => d.file === file);
+          if (doc) {
+            doc.headings = activeDocHeadings;
+          }
           renderNav(currentFilterText);
         } catch (error) {
           titleEl.textContent = "문서를 불러오는 중 오류 발생";
