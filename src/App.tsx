@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,10 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useChatStore } from "@/hooks/useChatStore";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import Chat from "./pages/Chat";
 import Insights from "./pages/Insights";
 import NotFound from "./pages/NotFound";
@@ -20,12 +25,33 @@ function AppContent() {
     addConversation,
   } = useChatStore();
 
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [mode, setMode] = useState<"GUIDED" | "CUSTOM" | null>(null);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [personaTitle, setPersonaTitle] = useState("");
+
   const handleNewConversation = () => {
-    addConversation();
+    setMode(null);
+    setCustomPrompt("");
+    setPersonaTitle("");
+    setShowNewChat(true);
   };
 
   const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
+  };
+
+  const startGuided = () => {
+    const id = addConversation({ mode: "GUIDED" });
+    setActiveConversation(id);
+    setShowNewChat(false);
+  };
+
+  const startCustom = () => {
+    if (!customPrompt.trim()) return;
+    const id = addConversation({ mode: "CUSTOM", customPrompt: customPrompt.trim(), personaTitle: personaTitle.trim() || undefined });
+    setActiveConversation(id);
+    setShowNewChat(false);
   };
 
   return (
@@ -50,6 +76,55 @@ function AppContent() {
           </main>
         </div>
       </div>
+
+      <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>새 대화 시작</DialogTitle>
+          </DialogHeader>
+
+          {!mode && (
+            <div className="grid grid-cols-1 gap-3">
+              <Button className="justify-start" variant="default" onClick={startGuided}>
+                🧘‍♂️ 그림자 작업 시작하기
+              </Button>
+              <Button className="justify-start" variant="secondary" onClick={() => setMode("CUSTOM") }>
+                ✨ 새 페르소나 만들기
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                가이드: 실패 경험을 탐색하고 통찰을 얻는 대화. 커스텀: AI 역할을 직접 정의합니다.
+              </p>
+            </div>
+          )}
+
+          {mode === "CUSTOM" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">페르소나 제목(선택)</label>
+                <Input
+                  placeholder="예: 친절한 물리학자 / 기술 면접관"
+                  value={personaTitle}
+                  onChange={(e) => setPersonaTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">시스템 프롬프트</label>
+                <Textarea
+                  rows={8}
+                  placeholder="예시: 당신은 5살 아이도 이해할 수 있도록 양자역학의 원리를 설명해주는 친절한 물리학자입니다..."
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">최대 4000자 권장</p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setMode(null)} variant="ghost">뒤로</Button>
+                <Button onClick={startCustom} disabled={!customPrompt.trim()}>대화 시작</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }

@@ -10,13 +10,14 @@ interface ChatState {
   insights: Insight[];
   activeConversationId: string | null;
 
-  addConversation: () => string;
+  addConversation: (opts?: { mode?: "GUIDED" | "CUSTOM"; customPrompt?: string; personaTitle?: string }) => string;
   addMessage: (conversationId: string, message: Omit<Message, "id" | "timestamp">) => void;
   saveInsight: (conversationId: string, messageId: string) => void;
   deleteInsight: (insightId: string) => void;
   updateInsightNote: (insightId: string, note: string) => void;
   setActiveConversation: (id: string | null) => void;
   getActiveMessages: () => Message[];
+  getActiveConversation: () => Conversation | undefined;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -27,13 +28,20 @@ export const useChatStore = create<ChatState>()(
       insights: [],
       activeConversationId: null,
 
-      addConversation: () => {
+      addConversation: (opts) => {
         const id = `conv-${Date.now()}`;
+        const mode = opts?.mode ?? "GUIDED";
+        const personaTitle = opts?.personaTitle;
+        const customPrompt = opts?.customPrompt;
+        const title = personaTitle || (mode === "CUSTOM" ? "커스텀 세션" : "새로운 대화");
         const newConversation: Conversation = {
           id,
-          title: "새로운 대화",
+          title,
           lastMessage: "",
           timestamp: new Date(),
+          mode,
+          personaTitle,
+          customPrompt,
         };
         set((state) => ({
           conversations: [newConversation, ...state.conversations],
@@ -61,7 +69,7 @@ export const useChatStore = create<ChatState>()(
               return {
                 ...conv,
                 title:
-                  conversationMessages.length === 0 && message.role === "user"
+                  conversationMessages.length === 0 && message.role === "user" && conv.mode !== "CUSTOM"
                     ? message.content.slice(0, 50) + (message.content.length > 50 ? "..." : "")
                     : conv.title,
                 lastMessage: message.content.slice(0, 100),
@@ -144,6 +152,12 @@ export const useChatStore = create<ChatState>()(
         const state = get();
         if (!state.activeConversationId) return [];
         return state.messages[state.activeConversationId] || [];
+      },
+
+      getActiveConversation: () => {
+        const state = get();
+        if (!state.activeConversationId) return undefined;
+        return state.conversations.find((c) => c.id === state.activeConversationId);
       },
     }),
     {

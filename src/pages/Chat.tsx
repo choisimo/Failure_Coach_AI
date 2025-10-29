@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
@@ -6,6 +6,8 @@ import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
 import { requestGatewayCompletion } from "@/lib/aiGateway";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -109,9 +111,12 @@ export default function Chat() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <div className="border-b border-border p-4">
-        <h1 className="text-lg font-semibold">대화</h1>
-      </div>
+       <div className="border-b border-border p-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">대화</h1>
+          </div>
+        </div>
+
 
       <ScrollArea className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">

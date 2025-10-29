@@ -8,6 +8,9 @@ export interface Conversation {
   title: string;
   lastMessage: string;
   timestamp: Date;
+  mode?: "GUIDED" | "CUSTOM";
+  personaTitle?: string;
+  customPrompt?: string;
 }
 
 interface ConversationListProps {
