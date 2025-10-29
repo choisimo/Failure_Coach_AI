@@ -7,7 +7,7 @@ import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
 import { requestGatewayCompletion } from "@/lib/aiGateway";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -150,11 +150,17 @@ export default function Chat() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-3 md:p-6">
         <div className="max-w-4xl mx-auto">
           {showWelcome && !isCustom && messages.length === 0 && (
-            <div className="mb-8 p-6 rounded-2xl bg-card border border-primary/30 animate-fade-in">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{WELCOME_MESSAGE}</p>
+            <div className="mb-8 p-6 rounded-2xl bg-card border border-border shadow-sm animate-fade-in">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">💭</div>
+                <div className="flex-1">
+                  <h2 className="text-base font-semibold glow-text mb-2">마음 거울에 오신 것을 환영합니다</h2>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{WELCOME_MESSAGE}</p>
+                </div>
+              </div>
             </div>
           )}
 
