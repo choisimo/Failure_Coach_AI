@@ -2,7 +2,13 @@
 
 자기 성찰을 돕는 AI 챗봇 웹 애플리케이션입니다. 비판단적인 대화를 통해 사용자 스스로 내면을 탐색할 수 있도록 안내합니다.
 
-## 주요 기능
+### 사용자 인터페이스
+![chat-start](./public/assets/images/chat-start.png)
+![chat-end](./public/assets/images/user-custom-prompting.png)
+![stalin](./public/assets/images/IOS-prompt.png)
+![chat-end](./public/assets/images/preview-chat.png)
+
+### 기능
 
 - 자기 성찰 질문 흐름과 응답 기록
 - 대화 맥락을 반영한 맞춤형 질문 생성
