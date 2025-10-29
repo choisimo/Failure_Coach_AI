@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.16.0/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" />
     <style>
       body {
         margin: 0;
@@ -28,17 +30,32 @@
         font-size: 1.25rem;
         margin: 0;
       }
+      nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
       nav a {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         padding: 10px 12px;
         border-radius: 8px;
         color: inherit;
         text-decoration: none;
         font-size: 0.95rem;
+        transition: background 0.2s ease;
+      }
+      nav a:hover {
+        background: rgba(255, 255, 255, 0.12);
       }
       nav a.active {
-        background: rgba(255, 255, 255, 0.18);
+        background: rgba(14, 165, 233, 0.35);
         font-weight: 600;
+      }
+      nav small {
+        font-size: 0.7rem;
+        opacity: 0.65;
       }
       main {
         flex: 1;
@@ -48,7 +65,7 @@
       main h1 {
         margin-top: 0;
       }
-      #doc-content {
+      .markdown-body {
         max-width: 960px;
         margin: 0 auto;
         background: white;
@@ -56,28 +73,84 @@
         border-radius: 16px;
         box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
       }
-      #doc-content pre {
-        background: #0f172a;
-        color: #f8fafc;
-        padding: 16px;
-        border-radius: 8px;
-        overflow-x: auto;
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(14, 165, 233, 0.12);
+        color: #e0f2fe;
+        border-radius: 999px;
+        font-size: 0.75rem;
       }
-      #doc-content table {
+      .search-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .search-box input {
         width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 12px 10px 34px;
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+        outline: none;
       }
-      #doc-content th,
-      #doc-content td {
-        border: 1px solid rgba(148, 163, 184, 0.6);
-        padding: 8px 12px;
+      .search-box svg {
+        position: absolute;
+        left: 10px;
+        width: 16px;
+        height: 16px;
+        opacity: 0.65;
       }
-      #doc-content blockquote {
-        border-left: 4px solid #0ea5e9;
+      .toc {
+        border-left: 4px solid rgba(14, 165, 233, 0.35);
+        padding-left: 16px;
+        margin: 24px 0;
         background: rgba(14, 165, 233, 0.08);
-        padding: 12px 16px;
-        margin: 12px 0;
+        border-radius: 8px;
+      }
+      .toc h2 {
+        margin-top: 0;
+        font-size: 1rem;
+        color: #0369a1;
+      }
+      .toc ul {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+        display: grid;
+        gap: 4px;
+      }
+      .toc a {
+        color: #0369a1;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        text-decoration: underline;
+      }
+      #meta-panel {
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 0.8rem;
+      }
+      #meta-panel strong {
+        font-weight: 600;
+        color: #bae6fd;
+      }
+      details summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 24px;
+        font-size: 0.8rem;
+        color: rgba(8, 16, 41, 0.6);
       }
       @media (max-width: 768px) {
         body {
@@ -89,8 +162,9 @@
           overflow-x: auto;
         }
         nav {
-          display: flex;
+          flex-direction: row;
           gap: 8px;
+          overflow-x: auto;
         }
         nav a {
           white-space: nowrap;
@@ -98,7 +172,7 @@
         main {
           padding: 16px;
         }
-        #doc-content {
+        .markdown-body {
           padding: 24px;
         }
       }
@@ -110,41 +184,140 @@
         <h1>Wiki Docs</h1>
         <p style="margin: 4px 0 0; opacity: 0.7; font-size: 0.85rem;">Self Insight Chat · IRL 문서 허브</p>
       </div>
-      <nav id="doc-nav"></nav>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input id="search-input" placeholder="문서 검색" />
+      </div>
+      <div id="meta-panel">
+        <div><strong>총 문서</strong> <span id="doc-count">0</span>개</div>
+        <div><strong>현재 문서</strong> <span id="doc-meta-title">-</span></div>
+        <div><strong>최종 업데이트</strong> <span id="doc-meta-updated">-</span></div>
+      </div>
+      <details open>
+        <summary>문서 목록</summary>
+        <nav id="doc-nav"></nav>
+      </details>
+      <a href="../" style="margin-top: auto; color: rgba(255,255,255,0.7); font-size: 0.85rem;">← 메인 앱으로 돌아가기</a>
     </aside>
     <main>
-      <div id="doc-content">
+      <article class="markdown-body">
+        <div class="badge">📚 IRL Wiki</div>
         <h1 id="doc-title">문서를 불러오는 중...</h1>
-        <div id="doc-body" class="markdown-body">잠시만 기다려주세요.</div>
-      </div>
+        <section class="toc" id="doc-toc" hidden>
+          <h2>목차</h2>
+          <ul id="toc-list"></ul>
+        </section>
+        <div id="doc-body">잠시만 기다려주세요.</div>
+        <footer>
+          <p>GitHub Pages · <code>/wiki-docs/</code> · markdown 렌더링 by <a href="https://marked.js.org/" target="_blank">marked.js</a>.</p>
+        </footer>
+      </article>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
     <script>
       const DOCS = [
-        { file: "irl-hybrid-spec.md", title: "IRL 하이브리드 재랭킹 및 관측성 스펙" },
-        { file: "irl-refactor-prd.md", title: "IRL 리팩토링 PRD" },
-        { file: "irl-hybrid-backlog.md", title: "IRL 하이브리드 백로그" }
+        { file: "irl-hybrid-spec.md", title: "IRL 하이브리드 재랭킹 및 관측성 스펙", category: "스펙" },
+        { file: "irl-refactor-prd.md", title: "IRL 리팩토링 PRD", category: "프로젝트" },
+        { file: "irl-hybrid-backlog.md", title: "IRL 하이브리드 백로그", category: "프로젝트" },
+        { file: "telemetry/irl-telemetry-schema.md", title: "IRL 텔레메트리 스키마", category: "텔레메트리" },
+        { file: "api/irl-hybrid-openapi.yaml", title: "IRL Hybrid OpenAPI 스펙", category: "API" },
+        { file: "api/swagger-ui.html", title: "Swagger UI (열기)", category: "API", external: true }
       ];
 
       const navEl = document.getElementById("doc-nav");
       const titleEl = document.getElementById("doc-title");
       const bodyEl = document.getElementById("doc-body");
+      const metaTitleEl = document.getElementById("doc-meta-title");
+      const metaUpdatedEl = document.getElementById("doc-meta-updated");
+      const docCountEl = document.getElementById("doc-count");
+      const tocEl = document.getElementById("doc-toc");
+      const tocListEl = document.getElementById("toc-list");
+      const searchInput = document.getElementById("search-input");
 
       const params = new URLSearchParams(window.location.search);
       let activeDoc = params.get("doc") || DOCS[0].file;
 
-      function updateNav() {
+      marked.use({
+        breaks: true,
+        mangle: false,
+        headerIds: true,
+        headerPrefix: "wiki-heading-"
+      });
+
+      docCountEl.textContent = DOCS.length;
+
+      function formatDate(date) {
+        return date.toLocaleString("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+      }
+
+      async function getFileMeta(path) {
+        try {
+          const res = await fetch(`./${path}?_=${Date.now()}`, { method: "HEAD" });
+          if (!res.ok) return null;
+          const updated = res.headers.get("last-modified");
+          return updated ? new Date(updated) : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function renderNav(filterText = "") {
         navEl.innerHTML = "";
-        DOCS.forEach((doc) => {
+        DOCS.filter((doc) => {
+          return doc.title.toLowerCase().includes(filterText.toLowerCase());
+        }).forEach((doc) => {
           const link = document.createElement("a");
-          link.href = `?doc=${doc.file}`;
-          link.textContent = doc.title;
-          if (doc.file === activeDoc) {
+          if (doc.external) {
+            link.href = `./${doc.file}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+          } else {
+            link.href = `?doc=${doc.file}`;
+          }
+          const titleSpan = document.createElement("span");
+          titleSpan.textContent = doc.title;
+          const cat = document.createElement("small");
+          cat.textContent = doc.category;
+          link.append(titleSpan, cat);
+          if (doc.file === activeDoc && !doc.external) {
             link.classList.add("active");
           }
           navEl.appendChild(link);
         });
+      }
+
+      function buildTOC() {
+        const headings = bodyEl.querySelectorAll("h1, h2, h3");
+        tocListEl.innerHTML = "";
+        const items = Array.from(headings).filter((h) => h.id);
+        if (items.length === 0) {
+          tocEl.hidden = true;
+          return;
+        }
+        items.forEach((heading) => {
+          if (heading.tagName.toLowerCase() === "h1") return;
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = `#${heading.id}`;
+          a.textContent = heading.textContent;
+          li.style.paddingLeft = heading.tagName === "H3" ? "12px" : "0";
+          li.appendChild(a);
+          tocListEl.appendChild(li);
+        });
+        tocEl.hidden = false;
       }
 
       async function loadDoc(file) {
@@ -152,16 +325,30 @@
           const response = await fetch(`./${file}`);
           if (!response.ok) throw new Error("문서를 불러오지 못했습니다.");
           const raw = await response.text();
-          titleEl.textContent = DOCS.find((doc) => doc.file === file)?.title ?? file;
-          bodyEl.innerHTML = marked.parse(raw, { breaks: true });
+          const meta = DOCS.find((doc) => doc.file === file);
+          titleEl.textContent = meta?.title ?? file;
+          bodyEl.innerHTML = marked.parse(raw);
+          Prism.highlightAllUnder(bodyEl);
+          const updatedDate = await getFileMeta(file);
+          metaTitleEl.textContent = meta?.title ?? file;
+          metaUpdatedEl.textContent = updatedDate ? formatDate(updatedDate) : "-";
+          buildTOC();
         } catch (error) {
           titleEl.textContent = "문서를 불러오는 중 오류 발생";
           bodyEl.textContent = error.message;
+          metaTitleEl.textContent = "-";
+          metaUpdatedEl.textContent = "-";
+          tocEl.hidden = true;
         }
       }
 
-      updateNav();
+      renderNav();
       loadDoc(activeDoc);
+
+      searchInput.addEventListener("input", (event) => {
+        const value = event.target.value.trim();
+        renderNav(value);
+      });
     </script>
   </body>
 </html>
