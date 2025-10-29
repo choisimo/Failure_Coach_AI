@@ -6,6 +6,8 @@ import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
 import { requestGatewayCompletion } from "@/lib/aiGateway";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -22,6 +24,11 @@ export default function Chat() {
     addMessage,
     saveInsight,
   } = useChatStore();
+
+  const activeConversation = useChatStore((s) =>
+    s.activeConversationId ? s.conversations.find((c) => c.id === s.activeConversationId) : undefined
+  );
+
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -40,6 +47,12 @@ export default function Chat() {
     }
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (activeConversation?.mode === "CUSTOM") {
+      setShowWelcome(false);
+    }
+  }, [activeConversation?.mode]);
+
   const handleSend = async (content: string) => {
     if (!activeConversationId) return;
 
@@ -57,6 +70,9 @@ export default function Chat() {
         messages: history,
         metadata: {
           conversationId: activeConversationId,
+          sessionMode: activeConversation?.mode,
+          customSystemPrompt: activeConversation?.customPrompt,
+          personaTitle: activeConversation?.personaTitle,
         },
       });
 
@@ -76,7 +92,7 @@ export default function Chat() {
   const handleSaveInsight = (messageId: string) => {
     if (!activeConversationId) return;
     saveInsight(activeConversationId, messageId);
-    
+
     const message = messages.find((m) => m.id === messageId);
     if (message?.saved) {
       toast({
@@ -99,36 +115,44 @@ export default function Chat() {
             <span className="text-3xl">💭</span>
           </div>
           <h2 className="text-2xl font-semibold mb-2 glow-text">대화를 시작해보세요</h2>
-          <p className="text-muted-foreground mb-6">
-            새로운 대화를 시작하거나 과거 대화를 선택해주세요.
-          </p>
+          <p className="text-muted-foreground mb-6">새로운 대화를 시작하거나 과거 대화를 선택해주세요.</p>
         </div>
       </div>
     );
   }
 
+  const isCustom = activeConversation?.mode === "CUSTOM";
+
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="border-b border-border p-4">
-        <h1 className="text-lg font-semibold">대화</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold">대화</h1>
+          {isCustom && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="ml-2">
+                  커스텀 모드: {activeConversation?.personaTitle || "커스텀 세션"}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
+                {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       <ScrollArea className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
-          {showWelcome && messages.length === 0 && (
+          {showWelcome && !isCustom && messages.length === 0 && (
             <div className="mb-8 p-6 rounded-2xl bg-card border border-primary/30 animate-fade-in">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-                {WELCOME_MESSAGE}
-              </p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{WELCOME_MESSAGE}</p>
             </div>
           )}
 
           {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              onSave={handleSaveInsight}
-            />
+            <ChatMessage key={message.id} message={message} onSave={handleSaveInsight} />
           ))}
 
           {isTyping && <TypingIndicator />}

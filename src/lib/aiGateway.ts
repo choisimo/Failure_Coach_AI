@@ -28,7 +28,11 @@ export interface GatewayResponse {
 // Cache session ids per conversation so we reuse server-side context
 const sessionCache = new Map<string, string>();
 
-async function createSession(title: string, signal?: AbortSignal): Promise<{ id: string; raw: unknown }> {
+async function createSession(
+  title: string,
+  metadata?: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<{ id: string; raw: unknown }> {
   const endpoint = `${getGatewayUrl()}/session`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -43,7 +47,7 @@ async function createSession(title: string, signal?: AbortSignal): Promise<{ id:
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, metadata }),
     signal,
   });
 
@@ -156,7 +160,18 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
 
   if (!sessionId) {
     const titleSource = messages.find(m => m.role === "user")?.content || "Conversation";
-    const { id, raw } = await createSession(titleSource.slice(0, 80), signal);
+
+    // Pass through session-related metadata for backend prompt configuration
+    const sessionMetadata: Record<string, unknown> | undefined = metadata
+      ? {
+          sessionMode: (metadata as any).sessionMode,
+          customSystemPrompt: (metadata as any).customSystemPrompt,
+          personaTitle: (metadata as any).personaTitle,
+          conversationId,
+        }
+      : undefined;
+
+    const { id, raw } = await createSession(titleSource.slice(0, 80), sessionMetadata, signal);
     sessionId = id;
     sessionCreateRaw = raw;
     if (conversationId) {
