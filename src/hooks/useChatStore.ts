@@ -18,6 +18,7 @@ interface ChatState {
   setActiveConversation: (id: string | null) => void;
   getActiveMessages: () => Message[];
   getActiveConversation: () => Conversation | undefined;
+  setConversationSession: (conversationId: string, sessionId: string) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -158,6 +159,14 @@ export const useChatStore = create<ChatState>()(
         const state = get();
         if (!state.activeConversationId) return undefined;
         return state.conversations.find((c) => c.id === state.activeConversationId);
+      },
+
+      setConversationSession: (conversationId, sessionId) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === conversationId ? { ...c, sessionId } : c
+          ),
+        }));
       },
     }),
     {

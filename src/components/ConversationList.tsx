@@ -11,6 +11,7 @@ export interface Conversation {
   mode?: "GUIDED" | "CUSTOM";
   personaTitle?: string;
   customPrompt?: string;
+  sessionId?: string;
 }
 
 interface ConversationListProps {

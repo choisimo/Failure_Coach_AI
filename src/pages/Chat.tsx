@@ -66,15 +66,22 @@ export default function Chat() {
     ];
 
     try {
-      const { reply } = await requestGatewayCompletion({
+      const { reply, raw } = await requestGatewayCompletion({
         messages: history,
         metadata: {
           conversationId: activeConversationId,
           sessionMode: activeConversation?.mode,
           customSystemPrompt: activeConversation?.customPrompt,
           personaTitle: activeConversation?.personaTitle,
+          sessionId: activeConversation?.sessionId,
         },
       });
+
+      // Persist sessionId after first creation
+      const createdId = (raw as any)?.sessionId || (raw as any)?.sessionCreate?.id;
+      if (createdId) {
+        useChatStore.getState().setConversationSession(activeConversationId, createdId);
+      }
 
       addMessage(activeConversationId, { role: "assistant", content: reply });
     } catch (error) {

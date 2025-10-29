@@ -66,7 +66,15 @@ async function createSession(
   return { id, raw: data };
 }
 
-async function sendMessage(sessionId: string, content: string, signal?: AbortSignal): Promise<unknown> {
+type MessageBody = {
+  kind?: string;
+  content: string;
+  noReply?: boolean;
+  parts?: Array<{ type: string; text: string }>;
+  metadata?: Record<string, unknown>;
+};
+
+async function postMessage(sessionId: string, body: MessageBody, signal?: AbortSignal): Promise<unknown> {
   const endpoint = `${getGatewayUrl()}/session/${encodeURIComponent(sessionId)}/message`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -78,14 +86,17 @@ async function sendMessage(sessionId: string, content: string, signal?: AbortSig
     headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
-  const payload = {
-    content,
-    parts: [
+  const payload: MessageBody = {
+    kind: body.kind ?? "prompt",
+    content: body.content,
+    noReply: body.noReply,
+    parts: body.parts ?? [
       {
         type: "text",
-        text: content,
+        text: body.content,
       },
     ],
+    metadata: body.metadata,
   };
 
   const response = await fetch(endpoint, {
@@ -148,38 +159,64 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
   }
 
   // Identify the latest user message to send
-  const latestUser = [...messages].reverse().find(m => m.role === "user");
+  const latestUser = [...messages].reverse().find((m) => m.role === "user");
   if (!latestUser || !latestUser.content?.trim()) {
     throw new Error("No user message content to send");
   }
 
-  const conversationId = (metadata as any)?.conversationId as string | undefined;
+  const meta = (metadata as any) || {};
+  const conversationId = meta.conversationId as string | undefined;
+  const mode = meta.sessionMode as ("GUIDED" | "CUSTOM" | undefined);
+  const customSystemPrompt = meta.customSystemPrompt as string | undefined;
+  const personaTitle = meta.personaTitle as string | undefined;
+  const providedSessionId = meta.sessionId as string | undefined;
 
-  let sessionId: string | undefined = conversationId ? sessionCache.get(conversationId) : undefined;
+  // Prefer provided sessionId (e.g., from store) then cache
+  let sessionId: string | undefined = providedSessionId || (conversationId ? sessionCache.get(conversationId) : undefined);
   let sessionCreateRaw: unknown | undefined;
 
   if (!sessionId) {
-    const titleSource = messages.find(m => m.role === "user")?.content || "Conversation";
+    // Title rules: prefix for CUSTOM, otherwise from first user message
+    const firstUserContent = messages.find((m) => m.role === "user")?.content || "Conversation";
+    const titleSource = mode === "CUSTOM" ? `Persona: ${personaTitle || "커스텀 세션"}` : firstUserContent.slice(0, 80);
 
-    // Pass through session-related metadata for backend prompt configuration
-    const sessionMetadata: Record<string, unknown> | undefined = metadata
+    // Only include metadata for CUSTOM mode
+    const sessionMetadata: Record<string, unknown> | undefined = mode === "CUSTOM"
       ? {
-          sessionMode: (metadata as any).sessionMode,
-          customSystemPrompt: (metadata as any).customSystemPrompt,
-          personaTitle: (metadata as any).personaTitle,
+          sessionMode: mode,
+          customSystemPrompt,
+          personaTitle,
           conversationId,
         }
       : undefined;
 
-    const { id, raw } = await createSession(titleSource.slice(0, 80), sessionMetadata, signal);
-    sessionId = id;
-    sessionCreateRaw = raw;
+    const created = await createSession(titleSource, sessionMetadata, signal);
+    sessionId = created.id;
+    sessionCreateRaw = created.raw;
+
+    // Inject seed system prompt for CUSTOM if provided
+    if (mode === "CUSTOM" && customSystemPrompt?.trim()) {
+      try {
+        await postMessage(sessionId, {
+          kind: "prompt",
+          content: customSystemPrompt,
+          noReply: true,
+          metadata: { source: "custom-mode-seed" },
+        }, signal);
+      } catch (e) {
+        // Rollback cache entry on seed failure
+        if (conversationId) sessionCache.delete(conversationId);
+        throw e instanceof Error ? e : new Error("Failed to send seed prompt");
+      }
+    }
+
     if (conversationId) {
       sessionCache.set(conversationId, sessionId);
     }
   }
 
-  const messageData = await sendMessage(sessionId!, latestUser.content, signal);
+  // Send the actual user message
+  const messageData = await postMessage(sessionId!, { content: latestUser.content }, signal);
   const reply = extractReply(messageData);
 
   if (typeof reply !== "string" || !reply.trim()) {
@@ -188,6 +225,6 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
 
   return {
     reply: reply.trim(),
-    raw: { sessionCreate: sessionCreateRaw, message: messageData },
+    raw: { sessionCreate: sessionCreateRaw, sessionId, message: messageData },
   };
 }
