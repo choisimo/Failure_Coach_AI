@@ -74,10 +74,20 @@ async function sendMessage(sessionId: string, content: string, signal?: AbortSig
     headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
+  const payload = {
+    content,
+    parts: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+  };
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(payload),
     signal,
   });
 
