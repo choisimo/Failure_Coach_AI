@@ -3,37 +3,10 @@
 자기 성찰을 돕는 AI 챗봇 웹 애플리케이션입니다. 비판단적인 대화를 통해 사용자 스스로 내면을 탐색할 수 있도록 안내합니다.
 
 ### 사용자 인터페이스
-
-![chat-start](./dist/assets/images/chat-start.png)
-
-new chat (option[IRL])
-
-![chat-start-2](./dist/assets/images/chat-start-2.png)
-
-new chat detail (option base/custom-prompting)
-
-
-![custom-prompt](./dist/assets/images/custom-prompt.png)
-
-new chat custom-prompting (system-prompt only)
-
-
-![custom-prompt-2](./dist/assets/images/custom-prompt-hal9000.png)
-
-new chat custom-prompting (example)
-
-
-![code-view](./dist/assets/images/code-1.png)
-
-chat view markdown style parsing design (including code)
-
-![insight-card](./dist/assets/images/insight-card.png)
-
-insight card (expanded : scroll)
-
-![insight-card-expanded](./dist/assets/images/insight-card-expanded.png)
-
----
+![chat-start](./public/assets/images/chat-start.png)
+![chat-end](./public/assets/images/user-custom-prompting.png)
+![stalin](./public/assets/images/IOS-prompt.png)
+![chat-end](./public/assets/images/preview-chat.png)
 
 ### 기능
 
@@ -79,20 +52,19 @@ npm run preview
 Cloudflare Worker 프록시는 GitHub Actions로 자동 배포됩니다.
 
 1. GitHub Repository Secrets 설정 (Settings → Secrets and variables → Actions)
+   | Secret 이름 | 설명 |
+   | --- | --- |
+   | `CF_API_TOKEN` | `wrangler deploy` 권한이 있는 Cloudflare API 토큰 |
+   | `CF_ACCOUNT_ID` | Cloudflare Account ID |
+   | `AI_GATEWAY_SECRET_INTERNAL_KEY` | 백엔드와 통신할 내부 키 |
+   | `AI_GATEWAY_SECRET_CALLER_KEY` *(선택)* | Worker → Worker 호출 시 사용 |
+   | `AI_GATEWAY_GITHUB_TOKEN` | Upstream 인증에 사용하는 GitHub 토큰 |
 
-   | Secret 이름                                 | 설명                                                |
-   | ------------------------------------------- | --------------------------------------------------- |
-   | `CF_API_TOKEN`                            | `wrangler deploy` 권한이 있는 Cloudflare API 토큰 |
-   | `CF_ACCOUNT_ID`                           | Cloudflare Account ID                               |
-   | `AI_GATEWAY_SECRET_INTERNAL_KEY`          | 백엔드와 통신할 내부 키                             |
-   | `AI_GATEWAY_SECRET_CALLER_KEY` *(선택)* | Worker → Worker 호출 시 사용                       |
-   | `AI_GATEWAY_GITHUB_TOKEN`                 | Upstream 인증에 사용하는 GitHub 토큰                |
 2. 워크플로우 `.github/workflows/deploy-ai-check-gateway.yml`
-
    - `main` 브랜치의 `workers/failure-ai-worker/**` 변경 시 자동 실행
    - Secrets를 `wrangler secret put`로 주입하고 `wrangler deploy` 수행
-3. 로컬 테스트
 
+3. 로컬 테스트
    ```sh
    cd workers/failure-ai-worker
    npm install --global wrangler@3

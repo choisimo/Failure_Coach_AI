@@ -4,10 +4,12 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { useChatStore } from "@/hooks/useChatStore";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { Star } from "lucide-react";
 
 export default function Insights() {
   const { insights, deleteInsight, updateInsightNote } = useChatStore();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const { state, isMobile } = useSidebar();
 
@@ -19,6 +21,10 @@ export default function Insights() {
 
   const handleNavigateToMessage = (conversationId: string | undefined, messageId: string) => {
     if (!conversationId) {
+      toast({
+        title: "대화를 찾을 수 없어요",
+        description: "대화 정보가 없어 홈으로 이동합니다.",
+      });
       navigate("/");
       return;
     }
