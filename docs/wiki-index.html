@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.16.0/cdn/themes/light.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-crdA8VnXWcWWfdbA/x6tEN84ImU8vzBL6Rca2hYdsfn5hzdm42Hc+5fB5odnHdCc" crossorigin="anonymous" />
     <style>
       :root {
         color-scheme: light dark;
@@ -393,6 +394,8 @@
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-QsARmQ3vlRd/OSDZi rozLKdVw5YLCowPxixDGom2ymlk/wEYBLETymFcpnSUsct" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-mll67QQ0lH0I1GtIsfRSAxEPPGjBJOCaOQGL3+rXhN3kLBXjg5eQqr8RP4eAbO2y" crossorigin="anonymous"></script>
     <script>
       const DOCS = [
         { file: "irl-hybrid-spec.md", title: "IRL 하이브리드 재랭킹 및 관측성 스펙", category: "스펙" },
@@ -621,6 +624,17 @@
           const html = marked.parse(raw, { renderer, slugger });
           bodyEl.innerHTML = html;
           Prism.highlightAllUnder(bodyEl);
+          if (typeof renderMathInElement === "function") {
+            renderMathInElement(bodyEl, {
+              delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "\\[", right: "\\]", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false }
+              ],
+              throwOnError: false
+            });
+          }
           const updatedDate = await getFileMeta(file);
           metaTitleEl.textContent = meta?.title ?? file;
           metaUpdatedEl.textContent = updatedDate ? formatDate(updatedDate) : "-";
