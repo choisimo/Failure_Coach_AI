@@ -11,6 +11,7 @@ import { computeHistoryHash } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/hooks/useSettingsStore";
+import { ContentLayout } from "@/components/ContentLayout";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -272,36 +273,38 @@ export default function Chat() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <div className="border-b border-border p-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">대화</h1>
-          {isCustom && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="ml-2">
-                  커스텀 모드: {activeConversation?.personaTitle || "커스텀 세션"}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
-                {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {irlEnabled && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="ml-2">전문가 가이드</Badge>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
-                IRL 정책으로 응답을 재랭킹합니다.\n정책 버전: {irlPolicyVersion}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
+      <div className="border-b border-border bg-background/95">
+        <ContentLayout className="py-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">대화</h1>
+            {isCustom && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="ml-2">
+                    커스텀 모드: {activeConversation?.personaTitle || "커스텀 세션"}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
+                  {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {irlEnabled && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="ml-2">전문가 가이드</Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
+                  IRL 정책으로 응답을 재랭킹합니다.\n정책 버전: {irlPolicyVersion}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </ContentLayout>
       </div>
 
-      <ScrollArea className="flex-1 p-3 md:p-6">
-        <div className="max-w-4xl mx-auto">
+      <ScrollArea className="flex-1">
+        <ContentLayout className="py-3 md:py-6">
           {showWelcome && !isCustom && messages.length === 0 && (
             <div className="mb-8 p-6 rounded-2xl bg-card border border-border shadow-sm animate-fade-in">
               <div className="flex items-start gap-3">
@@ -327,7 +330,7 @@ export default function Chat() {
 
           {isTyping && <TypingIndicator />}
           <div ref={scrollRef} />
-        </div>
+        </ContentLayout>
       </ScrollArea>
 
       <ChatInput onSend={handleSend} disabled={isTyping} />

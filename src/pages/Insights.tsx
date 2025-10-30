@@ -1,4 +1,5 @@
 import { InsightCard } from "@/components/InsightCard";
+import { ContentLayout } from "@/components/ContentLayout";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useChatStore } from "@/hooks/useChatStore";
 import { cn } from "@/lib/utils";
@@ -11,11 +12,10 @@ export default function Insights() {
   const { state, isMobile } = useSidebar();
 
   const isSidebarExpanded = state === "expanded";
-  const containerClass = cn(
-    "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 transition-[padding] duration-300",
+  const sectionPadding = cn(
+    "transition-[padding] duration-300",
     !isMobile && isSidebarExpanded ? "lg:pl-12 xl:pl-16" : !isMobile ? "lg:pl-10" : ""
   );
-  const sectionClass = cn(containerClass, "py-6");
 
   const handleNavigateToMessage = (messageId: string) => {
     // In a real app, this would scroll to the specific message
@@ -25,17 +25,17 @@ export default function Insights() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       <div className="border-b border-border bg-background/95">
-        <div className={sectionClass}>
+        <ContentLayout className={sectionPadding + " py-6"}>
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-semibold">나의 통찰</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">저장한 의미 있는 순간들을 모아보세요</p>
-        </div>
+        </ContentLayout>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className={sectionClass}>
+        <ContentLayout className={sectionPadding + " py-6"}>
           {insights.length === 0 ? (
             <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent/20">
@@ -60,7 +60,7 @@ export default function Insights() {
               ))}
             </div>
           )}
-        </div>
+        </ContentLayout>
       </div>
     </div>
   );
