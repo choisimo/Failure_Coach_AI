@@ -545,6 +545,44 @@
         tocEl.hidden = false;
       }
 
+      function createSlugger() {
+        const isSlugger = (candidate) => candidate && typeof candidate.slug === "function";
+
+        if (typeof marked?.Slugger === "function") {
+          try {
+            const instance = new marked.Slugger();
+            if (isSlugger(instance)) return instance;
+          } catch (_) {
+            try {
+              const fallback = marked.Slugger();
+              if (isSlugger(fallback)) return fallback;
+            } catch (_) {}
+          }
+        }
+
+        if (typeof marked?.slugger === "function") {
+          const instance = marked.slugger();
+          if (isSlugger(instance)) return instance;
+        }
+
+        const seen = new Map();
+        return {
+          slug(value = "") {
+            const base = value
+              .toString()
+              .toLowerCase()
+              .trim()
+              .replace(/<[^>]+>/g, "")
+              .replace(/[^\w\uAC00-\uD7A3]+/g, "-")
+              .replace(/^-+|-+$/g, "")
+              || "section";
+            const count = seen.get(base) || 0;
+            seen.set(base, count + 1);
+            return count === 0 ? base : `${base}-${count}`;
+          }
+        };
+      }
+
       async function loadDoc(file) {
         try {
           const response = await fetch(`./${file}`);
@@ -554,7 +592,7 @@
           titleEl.textContent = meta?.title ?? file;
 
           const collectedHeadings = [];
-          const slugger = new marked.Slugger();
+          const slugger = createSlugger();
           const renderer = new marked.Renderer();
           const headingPrefix = "wiki-heading-";
 
