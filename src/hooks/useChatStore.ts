@@ -140,7 +140,6 @@ export const useChatStore = create<ChatState>()(
         const insight: Insight = {
           id: `insight-${Date.now()}`,
           messageId,
-          conversationId,
           content: message.content,
           conversationTitle: conversation.title,
           timestamp: new Date(),

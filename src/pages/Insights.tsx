@@ -17,13 +17,9 @@ export default function Insights() {
     !isMobile && isSidebarExpanded ? "lg:pl-12 xl:pl-16" : !isMobile ? "lg:pl-10" : ""
   );
 
-  const handleNavigateToMessage = (conversationId: string | undefined, messageId: string) => {
-    if (!conversationId) {
-      navigate("/");
-      return;
-    }
-
-    navigate(`/chat/${conversationId}#message-${messageId}`);
+  const handleNavigateToMessage = (messageId: string) => {
+    // In a real app, this would scroll to the specific message
+    navigate("/");
   };
 
   return (
