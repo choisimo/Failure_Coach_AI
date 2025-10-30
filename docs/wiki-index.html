@@ -596,14 +596,26 @@
           const renderer = new marked.Renderer();
           const headingPrefix = "wiki-heading-";
 
+          const normalizeToString = (value) => {
+            if (typeof value === "string") return value;
+            if (value == null) return "";
+            if (Array.isArray(value)) return value.map(normalizeToString).join("");
+            if (typeof value === "object" && "text" in value && typeof value.text === "string") {
+              return value.text;
+            }
+            return String(value);
+          };
+
           renderer.heading = function (text, level, rawText) {
-            const slug = slugger.slug(rawText);
+            const normalizedRaw = normalizeToString(rawText);
+            const normalizedText = normalizeToString(text);
+            const slug = slugger.slug(normalizedRaw || normalizedText);
             const id = `${headingPrefix}${slug}`;
-            const plain = text.replace(/<[^>]+>/g, "");
+            const plain = normalizedText.replace(/<[^>]+>/g, "");
             if (level <= 3) {
               collectedHeadings.push({ id, text: plain, level });
             }
-            return `<h${level} id="${id}">${text}</h${level}>`;
+            return `<h${level} id="${id}">${normalizedText}</h${level}>`;
           };
 
           const html = marked.parse(raw, { renderer, slugger });
