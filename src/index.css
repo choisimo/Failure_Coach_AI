@@ -8,6 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* App core palette (dark default) */
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
@@ -51,6 +52,105 @@ All colors MUST be HSL.
     --shadow-subtle: 0 4px 6px -1px hsl(222 47% 11% / 0.3);
     --shadow-glow: 0 0 20px hsl(158 64% 52% / 0.2);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* PRD Typography tokens (dark default) */
+    --text-primary: 210 40% 98%;
+    --text-body: 210 30% 92%;
+    --text-secondary: 215 20% 75%;
+    --text-muted: 215 20% 65%;
+    --link-default: 222 85% 66%;
+
+    /* Callout tokens (dark) */
+    --callout-info-bg: 217 33% 15%;
+    --callout-info-border: 222 85% 66%;
+    --callout-success-bg: 152 28% 18%;
+    --callout-success-border: 152 56% 42%;
+    --callout-warning-bg: 37 45% 20%;
+    --callout-warning-border: 37 100% 56%;
+    --callout-danger-bg: 358 40% 20%;
+    --callout-danger-border: 358 74% 59%;
+
+    /* Table tokens */
+    --table-header-bg: 217 33% 17%;
+    --table-row-bg: 222 47% 11%;
+    --table-row-alt-bg: 217 33% 14%;
+    --table-row-hover-bg: 217 33% 22%;
+
+    /* Tag tokens (dark) */
+    --tag-info-bg: 217 33% 20%;
+    --tag-info-text: 217 100% 88%;
+    --tag-success-bg: 152 28% 22%;
+    --tag-success-text: 150 40% 85%;
+    --tag-warning-bg: 37 45% 24%;
+    --tag-warning-text: 40 100% 88%;
+    --tag-danger-bg: 358 40% 24%;
+    --tag-danger-text: 355 86% 88%;
+  }
+}
+
+/* Light mode tokens per PRD */
+@layer base {
+  [data-theme="light"] {
+    --background: 0 0% 100%;
+    --foreground: 220 13% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%;
+
+    --primary: 222 85% 56%; /* link blue as primary in light */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 13% 96%;
+    --secondary-foreground: 220 13% 9%;
+
+    --muted: 220 13% 96%;
+    --muted-foreground: 220 13% 45%;
+
+    --accent: 45 93% 58%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 358 74% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 222 85% 56%;
+
+    /* PRD Typography tokens (light) */
+    --text-primary: 220 13% 9%;   /* #14161A approx */
+    --text-body: 220 13% 14%;     /* #1F2228 approx */
+    --text-secondary: 220 12% 20%;/* #2C3138 approx */
+    --text-muted: 220 13% 45%;    /* #596273 approx */
+    --link-default: 222 85% 56%;  /* #2F6AEF */
+
+    /* Callout tokens (light) */
+    --callout-info-bg: 217 100% 96%;   /* #EBF3FF */
+    --callout-info-border: 222 85% 56%;/* #2F6AEF */
+    --callout-success-bg: 144 40% 93%; /* #E6F3EA approx */
+    --callout-success-border: 152 56% 42%; /* #2FA86E */
+    --callout-warning-bg: 40 100% 95%; /* #FFF6E5 */
+    --callout-warning-border: 37 100% 56%; /* #FFB020 */
+    --callout-danger-bg: 352 80% 96%; /* #FDECEE */
+    --callout-danger-border: 358 74% 59%; /* #E5484D */
+
+    /* Table tokens (light) */
+    --table-header-bg: 0 0% 100%;
+    --table-row-bg: 0 0% 100%;
+    --table-row-alt-bg: 220 13% 98%;
+    --table-row-hover-bg: 220 13% 96%;
+
+    /* Tag tokens (light) */
+    --tag-info-bg: 217 100% 96%;
+    --tag-info-text: 222 85% 30%;
+    --tag-success-bg: 144 40% 93%;
+    --tag-success-text: 152 56% 30%;
+    --tag-warning-bg: 40 100% 95%;
+    --tag-warning-text: 37 100% 30%;
+    --tag-danger-bg: 352 80% 96%;
+    --tag-danger-text: 358 74% 35%;
   }
 }
 
@@ -62,6 +162,12 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Accessible focus outline */
+  :focus-visible {
+    outline: 2px solid hsl(var(--link-default));
+    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
@@ -80,6 +186,56 @@ All colors MUST be HSL.
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-primary/50;
   }
+}
+
+@layer components {
+  /* Typography utilities per PRD */
+  .typo-h1 {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1.25;
+    color: hsl(var(--text-primary));
+    letter-spacing: -0.01em;
+  }
+  .typo-h2 {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.35;
+    color: hsl(var(--text-primary));
+  }
+  .typo-h3 {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 1.4;
+    color: hsl(var(--text-secondary));
+  }
+  .typo-body {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.7;
+    color: hsl(var(--text-body));
+  }
+  .typo-caption {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.5;
+    color: hsl(var(--text-muted));
+  }
+
+  /* Document content container */
+  .prose-doc {
+    max-width: 720px;
+  }
+  .prose-doc p + p { margin-top: 16px; }
+  .prose-doc ul { list-style: disc; padding-left: 1.25rem; }
+  .prose-doc ol { list-style: decimal; padding-left: 1.25rem; }
+  .prose-doc li + li { margin-top: 8px; }
+  .prose-doc a { color: hsl(var(--link-default)); text-decoration: underline; text-underline-offset: 2px; }
 }
 
 @layer utilities {
