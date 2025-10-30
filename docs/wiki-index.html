@@ -29,6 +29,8 @@
         flex-direction: column;
         gap: 16px;
         box-shadow: 4px 0 24px rgba(16, 25, 54, 0.28);
+        position: relative;
+        z-index: 50;
       }
       aside h1 {
         font-size: 1.25rem;
@@ -70,6 +72,20 @@
         font-size: 0.7rem;
         opacity: 0.7;
         margin-left: 12px;
+      }
+      .nav-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+        pointer-events: none;
+        z-index: 40;
+      }
+      body.nav-open .nav-overlay {
+        opacity: 1;
+        pointer-events: auto;
       }
       .nav-sublist {
         list-style: none;
@@ -211,28 +227,64 @@
         font-size: 0.85rem;
         color: rgba(8, 16, 41, 0.65);
       }
+      .mobile-toggle {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: none;
+        background: rgba(14, 165, 233, 0.16);
+        color: #0369a1;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 18px;
+        box-shadow: 0 6px 16px rgba(14, 165, 233, 0.2);
+        transition: transform 0.15s ease;
+      }
+      .mobile-toggle:active {
+        transform: scale(0.98);
+      }
       @media (max-width: 768px) {
         body {
           flex-direction: column;
         }
         aside {
-          width: 100%;
-          flex-direction: row;
-          overflow-x: auto;
+          width: 80vw;
+          max-width: 320px;
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          transform: translateX(-105%);
+          transition: transform 0.28s ease;
+          padding: 24px 18px 32px;
+          overflow-y: auto;
+          border-radius: 0 24px 24px 0;
+        }
+        body.nav-open aside {
+          transform: translateX(0);
         }
         nav {
-          flex-direction: row;
-          gap: 8px;
-          overflow-x: auto;
+          flex-direction: column;
+          gap: 6px;
+          overflow-x: visible;
         }
         nav a {
-          white-space: nowrap;
+          white-space: normal;
         }
         main {
           padding: 24px;
         }
         .markdown-body {
           padding: 28px;
+        }
+        .mobile-toggle {
+          display: inline-flex;
+        }
+        body.nav-open {
+          overflow: hidden;
         }
       }
     </style>
@@ -261,7 +313,12 @@
       </details>
       <a href="../" style="margin-top: auto; color: rgba(226, 232, 240, 0.85); font-size: 0.85rem; text-decoration: none;">← 메인 앱으로 돌아가기</a>
     </aside>
+    <div id="nav-overlay" class="nav-overlay"></div>
     <main>
+      <button id="nav-toggle" class="mobile-toggle">
+        <span style="font-size: 1.2rem;">☰</span>
+        <span>문서 메뉴</span>
+      </button>
       <article class="markdown-body">
         <div class="badge">📚 IRL Wiki</div>
         <h1 id="doc-title">문서를 불러오는 중...</h1>
@@ -325,6 +382,9 @@
       const tocEl = document.getElementById("doc-toc");
       const tocListEl = document.getElementById("toc-list");
       const searchInput = document.getElementById("search-input");
+      const navToggle = document.getElementById("nav-toggle");
+      const navOverlay = document.getElementById("nav-overlay");
+      const rootBody = document.body;
 
       const params = new URLSearchParams(window.location.search);
       let activeDoc = params.get("doc") || DOCS[0].file;
@@ -361,6 +421,18 @@
 
       let currentFilterText = "";
       let activeDocHeadings = [];
+
+      function openNav() {
+        rootBody.classList.add("nav-open");
+      }
+
+      function closeNav() {
+        rootBody.classList.remove("nav-open");
+      }
+
+      function toggleNav() {
+        rootBody.classList.toggle("nav-open");
+      }
 
       function renderNav(filterText = "") {
         currentFilterText = filterText;
@@ -405,6 +477,7 @@
                       document.querySelectorAll(".nav-sublist a.active-heading").forEach((el) => el.classList.remove("active-heading"));
                       subLink.classList.add("active-heading");
                     }, 0);
+                    closeNav();
                   }
                 });
                 li.appendChild(subLink);
@@ -413,6 +486,9 @@
               item.appendChild(subList);
             }
           }
+          link.addEventListener("click", () => {
+            closeNav();
+          });
           item.prepend(link);
           navEl.appendChild(item);
         });
@@ -481,6 +557,25 @@
       searchInput.addEventListener("input", (event) => {
         const value = event.target.value.trim();
         renderNav(value);
+      });
+
+      if (navToggle) {
+        navToggle.addEventListener("click", toggleNav);
+      }
+      if (navOverlay) {
+        navOverlay.addEventListener("click", closeNav);
+      }
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeNav();
+        }
+      });
+
+      window.matchMedia("(min-width: 769px)").addEventListener("change", (event) => {
+        if (event.matches) {
+          closeNav();
+        }
       });
     </script>
   </body>
