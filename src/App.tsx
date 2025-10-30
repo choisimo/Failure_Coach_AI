@@ -70,6 +70,7 @@ function AppContent() {
           <main className="flex-1 flex">
             <Routes>
               <Route path="/" element={<Chat />} />
+              <Route path="/chat/:conversationId" element={<Chat />} />
               <Route path="/insights" element={<Insights />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

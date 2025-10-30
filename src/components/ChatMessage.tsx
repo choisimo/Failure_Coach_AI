@@ -24,19 +24,21 @@ export interface Message {
 
 interface ChatMessageProps {
   message: Message;
+  highlighted?: boolean;
   onSave?: (messageId: string) => void;
   onCopy?: (messageId: string) => void;
   onLikeToggle?: (messageId: string) => void;
   onRegenerate?: (messageId: string) => void;
 }
 
-export const ChatMessage = ({ message, onSave, onCopy, onLikeToggle, onRegenerate }: ChatMessageProps) => {
+export const ChatMessage = ({ message, highlighted, onSave, onCopy, onLikeToggle, onRegenerate }: ChatMessageProps) => {
   const isUser = message.role === "user";
 
   return (
     <div
+      id={`message-${message.id}`}
       className={cn(
-        "flex gap-3 mb-4 message-enter",
+        "flex gap-3 mb-4 message-enter transition-colors",
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -49,10 +51,12 @@ export const ChatMessage = ({ message, onSave, onCopy, onLikeToggle, onRegenerat
       <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}> 
         <div
           className={cn(
-            "px-4 py-3 rounded-2xl max-w-[70%] relative group",
+            "px-4 py-3 rounded-2xl max-w-[70%] relative group transition-shadow",
             isUser
               ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-card border border-border shadow-sm"
+              : "bg-card border border-border shadow-sm",
+            highlighted && !isUser && "ring-2 ring-primary/40 shadow-lg",
+            highlighted && isUser && "ring-2 ring-primary/60 shadow-lg"
           )}
         >
           {/* Policy/IRL badges */}

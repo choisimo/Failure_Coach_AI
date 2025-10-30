@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 export interface Insight {
   id: string;
   messageId: string;
+  conversationId?: string;
   content: string;
   note?: string;
   conversationTitle: string;
@@ -19,7 +20,7 @@ interface InsightCardProps {
   insight: Insight;
   onDelete: (id: string) => void;
   onUpdateNote: (id: string, note: string) => void;
-  onNavigate: (messageId: string) => void;
+  onNavigate: (conversationId: string | undefined, messageId: string) => void;
 }
 
 export const InsightCard = ({
@@ -34,7 +35,7 @@ export const InsightCard = ({
   const [isOverflowing, setIsOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  const COLLAPSED_MAX_HEIGHT = 168;
+  const COLLAPSED_MAX_HEIGHT = 112;
   const EXPANDED_MAX_HEIGHT = 320;
 
   const evaluateOverflow = useCallback(() => {
@@ -157,7 +158,7 @@ export const InsightCard = ({
               {insight.note ? "메모 수정" : "메모 추가"}
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => onNavigate(insight.messageId)}>
+          <Button variant="outline" size="sm" onClick={() => onNavigate(insight.conversationId, insight.messageId)}>
             원본 대화 보기
           </Button>
           {!isEditingNote && (
