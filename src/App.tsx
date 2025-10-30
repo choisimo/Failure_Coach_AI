@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useChatStore } from "@/hooks/useChatStore";
@@ -25,6 +25,8 @@ function AppContent() {
     addConversation,
   } = useChatStore();
 
+  const navigate = useNavigate();
+
   const [showNewChat, setShowNewChat] = useState(false);
   const [mode, setMode] = useState<"GUIDED" | "CUSTOM" | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -39,11 +41,13 @@ function AppContent() {
 
   const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
+    navigate(`/chat/${id}`);
   };
 
   const startGuided = () => {
     const id = addConversation({ mode: "GUIDED" });
     setActiveConversation(id);
+    navigate(`/chat/${id}`);
     setShowNewChat(false);
   };
 
@@ -51,6 +55,7 @@ function AppContent() {
     if (!customPrompt.trim()) return;
     const id = addConversation({ mode: "CUSTOM", customPrompt: customPrompt.trim(), personaTitle: personaTitle.trim() || undefined });
     setActiveConversation(id);
+    navigate(`/chat/${id}`);
     setShowNewChat(false);
   };
 
