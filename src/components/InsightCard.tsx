@@ -35,16 +35,22 @@ export const InsightCard = ({
   const [isOverflowing, setIsOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  const COLLAPSED_MAX_HEIGHT = 112;
-  const EXPANDED_MAX_HEIGHT = 320;
+  const COLLAPSED_CARD_HEIGHT = 320;
+  const EXPANDED_CARD_HEIGHT = 520;
+  const COLLAPSED_CONTENT_MAX_HEIGHT = 148;
+  const EXPANDED_CONTENT_MAX_HEIGHT = 360;
+  const GRADIENT_HEIGHT = 72;
+
+  const cardHeight = isExpanded ? EXPANDED_CARD_HEIGHT : COLLAPSED_CARD_HEIGHT;
+  const contentMaxHeight = isExpanded ? EXPANDED_CONTENT_MAX_HEIGHT : COLLAPSED_CONTENT_MAX_HEIGHT;
 
   const evaluateOverflow = useCallback(() => {
     const element = contentRef.current;
     if (!element) return;
 
     const scrollHeight = element.scrollHeight;
-    setIsOverflowing(scrollHeight > COLLAPSED_MAX_HEIGHT + 4);
-  }, [COLLAPSED_MAX_HEIGHT]);
+    setIsOverflowing(scrollHeight > COLLAPSED_CONTENT_MAX_HEIGHT + 4);
+  }, [COLLAPSED_CONTENT_MAX_HEIGHT]);
 
   useEffect(() => {
     evaluateOverflow();
@@ -72,7 +78,13 @@ export const InsightCard = ({
   };
 
   return (
-    <Card className="p-4 bg-card border-border hover:border-primary/50 transition-all">
+    <Card
+      style={{ height: cardHeight }}
+      className={cn(
+        "flex flex-col p-4 bg-card border-border hover:border-primary/50 transition-all",
+        !isExpanded && "overflow-hidden"
+      )}
+    >
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <MessageSquare className="h-3 w-3" />
@@ -90,23 +102,25 @@ export const InsightCard = ({
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div
-          ref={contentRef}
-          className={cn(
-            "relative overflow-hidden rounded-xl border border-border/40 bg-card/60",
-            "transition-[max-height] duration-300 ease-in-out",
-            isExpanded ? `max-h-[${EXPANDED_MAX_HEIGHT}px]` : `max-h-[${COLLAPSED_MAX_HEIGHT}px]`
-          )}
-        >
-          <div className={cn("thin-scrollbar", isExpanded ? "overflow-y-auto" : "overflow-hidden")}
+      <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden rounded-xl border border-border/40 bg-card/60">
+          <div
+            ref={contentRef}
+            className={cn(
+              "thin-scrollbar h-full",
+              isExpanded ? "overflow-y-auto pr-1" : "overflow-hidden"
+            )}
+            style={{ maxHeight: contentMaxHeight }}
           >
             <div className="p-3">
               <MarkdownRenderer content={insight.content} className="text-sm leading-relaxed text-foreground/90" />
             </div>
           </div>
           {!isExpanded && isOverflowing && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent via-card/60 to-card" />
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-card/60 to-card"
+              style={{ height: GRADIENT_HEIGHT }}
+            />
           )}
         </div>
 
@@ -120,9 +134,8 @@ export const InsightCard = ({
             {isExpanded ? "접기" : "더 보기"}
           </button>
         )}
-      </div>
 
-      <div className="border-t border-border/40 pt-3 mt-4 flex flex-col gap-3">
+        <div className="border-t border-border/40 pt-3 mt-1 flex flex-1 flex-col gap-3">
         {isEditingNote ? (
           <div className="space-y-2">
             <Textarea
@@ -152,20 +165,21 @@ export const InsightCard = ({
           </div>
         )}
 
-        <div className="mt-auto flex flex-wrap gap-2 justify-end">
-          {isEditingNote ? null : (
-            <Button variant="secondary" size="sm" onClick={() => setIsEditingNote(true)}>
-              {insight.note ? "메모 수정" : "메모 추가"}
+          <div className="mt-auto flex flex-wrap gap-2 justify-end">
+            {isEditingNote ? null : (
+              <Button variant="secondary" size="sm" onClick={() => setIsEditingNote(true)}>
+                {insight.note ? "메모 수정" : "메모 추가"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => onNavigate(insight.conversationId, insight.messageId)}>
+              원본 대화 보기
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => onNavigate(insight.conversationId, insight.messageId)}>
-            원본 대화 보기
-          </Button>
-          {!isEditingNote && (
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80" onClick={() => onDelete(insight.id)}>
-              삭제
-            </Button>
-          )}
+            {!isEditingNote && (
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80" onClick={() => onDelete(insight.id)}>
+                삭제
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </Card>
