@@ -98,7 +98,7 @@
       }
       .nav-sublist a {
         font-size: 0.82rem;
-        color: rgba(226, 232, 240, 0.82);
+        color: rgba(241, 245, 249, 0.94);
         text-decoration: none;
         padding: 4px 6px;
         border-radius: 8px;
@@ -106,8 +106,8 @@
         transition: background 0.2s ease, color 0.2s ease;
       }
       .nav-sublist a:hover {
-        background: rgba(56, 189, 248, 0.12);
-        color: #e0f2fe;
+        background: rgba(56, 189, 248, 0.16);
+        color: #f0f9ff;
       }
       .nav-sublist li.level-3 a {
         padding-left: 18px;
@@ -130,10 +130,66 @@
       .markdown-body {
         max-width: 960px;
         margin: 0 auto;
-        background: rgba(255, 255, 255, 0.92);
+        background: rgba(255, 255, 255, 0.98);
         padding: 40px 48px;
         border-radius: 20px;
         box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+        color: #0f172a;
+        line-height: 1.68;
+      }
+      .markdown-body h1,
+      .markdown-body h2,
+      .markdown-body h3,
+      .markdown-body h4,
+      .markdown-body h5,
+      .markdown-body h6 {
+        color: #0b1220;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .markdown-body p,
+      .markdown-body ul,
+      .markdown-body ol,
+      .markdown-body li,
+      .markdown-body blockquote {
+        color: #1e293b;
+      }
+      .markdown-body a {
+        color: #0369a1;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+      }
+      .markdown-body code {
+        background: rgba(15, 23, 42, 0.08);
+        color: #0f172a;
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
+      .markdown-body pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+      .markdown-body pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 12px;
+        padding: 18px 20px;
+        line-height: 1.55;
+        overflow-x: auto;
+      }
+      .markdown-body table {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+      .markdown-body th {
+        background: rgba(148, 163, 184, 0.15);
+        color: #0f172a;
+      }
+      .markdown-body td {
+        color: #1f2937;
       }
       .badge {
         display: inline-flex;
@@ -339,33 +395,7 @@
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
     <script>
       const DOCS = [
-        {
-          file: "irl-hybrid-spec.md",
-          title: "IRL 하이브리드 재랭킹 및 관측성 스펙",
-          category: "스펙",
-          headings: [
-            { id: "wiki-heading-irl-하이브리드-재랭킹-및-관측성-스펙", text: "IRL 하이브리드 재랭킹 및 관측성 스펙", level: 1 },
-            { id: "wiki-heading-1-개요", text: "1. 개요", level: 2 },
-            { id: "wiki-heading-2-이해관계자", text: "2. 이해관계자", level: 2 },
-            { id: "wiki-heading-3-기능-개요", text: "3. 기능 개요", level: 2 },
-            { id: "wiki-heading-4-세부-요구사항", text: "4. 세부 요구사항", level: 2 },
-            { id: "wiki-heading-41-클라이언트", text: "4.1 클라이언트", level: 3 },
-            { id: "wiki-heading-42-gateway서버", text: "4.2 Gateway/서버", level: 3 },
-            { id: "wiki-heading-43-텔레메트리--피드백", text: "4.3 텔레메트리 & 피드백", level: 3 },
-            { id: "wiki-heading-44-오프라인-평가", text: "4.4 오프라인 평가", level: 3 },
-            { id: "wiki-heading-5-비기능-요구사항", text: "5. 비기능 요구사항", level: 2 },
-            { id: "wiki-heading-6-qa--승인-기준", text: "6. QA & 승인 기준", level: 2 },
-            { id: "wiki-heading-7-릴리스-전략", text: "7. 릴리스 전략", level: 2 },
-            { id: "wiki-heading-8-관련-문서--산출물", text: "8. 관련 문서 & 산출물", level: 2 },
-            { id: "wiki-heading-9-핵심-수식-및-공식", text: "9. 핵심 수식 및 공식", level: 2 },
-            { id: "wiki-heading-91-하이브리드-재랭킹-점수", text: "9.1 하이브리드 재랭킹 점수", level: 3 },
-            { id: "wiki-heading-92-불확실성-추정", text: "9.2 불확실성 추정", level: 3 },
-            { id: "wiki-heading-93-안전-게이트", text: "9.3 안전 게이트", level: 3 },
-            { id: "wiki-heading-94-히스토리-해시", text: "9.4 히스토리 해시", level: 3 },
-            { id: "wiki-heading-95-품질-지표", text: "9.5 품질 지표", level: 3 },
-            { id: "wiki-heading-10-구현-진척-현황-2025-10-29", text: "10. 구현 진척 현황 (2025-10-29)", level: 2 }
-          ]
-        },
+        { file: "irl-hybrid-spec.md", title: "IRL 하이브리드 재랭킹 및 관측성 스펙", category: "스펙" },
         { file: "irl-refactor-prd.md", title: "IRL 리팩토링 PRD", category: "프로젝트" },
         { file: "irl-hybrid-backlog.md", title: "IRL 하이브리드 백로그", category: "프로젝트" },
         { file: "telemetry/irl-telemetry-schema.md", title: "IRL 텔레메트리 스키마", category: "텔레메트리" },
@@ -522,19 +552,30 @@
           const raw = await response.text();
           const meta = DOCS.find((doc) => doc.file === file);
           titleEl.textContent = meta?.title ?? file;
-          bodyEl.innerHTML = marked.parse(raw);
+
+          const collectedHeadings = [];
+          const slugger = new marked.Slugger();
+          const renderer = new marked.Renderer();
+          const headingPrefix = "wiki-heading-";
+
+          renderer.heading = function (text, level, rawText) {
+            const slug = slugger.slug(rawText);
+            const id = `${headingPrefix}${slug}`;
+            const plain = text.replace(/<[^>]+>/g, "");
+            if (level <= 3) {
+              collectedHeadings.push({ id, text: plain, level });
+            }
+            return `<h${level} id="${id}">${text}</h${level}>`;
+          };
+
+          const html = marked.parse(raw, { renderer, slugger });
+          bodyEl.innerHTML = html;
           Prism.highlightAllUnder(bodyEl);
           const updatedDate = await getFileMeta(file);
           metaTitleEl.textContent = meta?.title ?? file;
           metaUpdatedEl.textContent = updatedDate ? formatDate(updatedDate) : "-";
           buildTOC();
-          activeDocHeadings = Array.from(bodyEl.querySelectorAll("h1, h2, h3"))
-            .filter((heading) => heading.id)
-            .map((heading) => ({
-              id: heading.id,
-              text: heading.textContent || heading.innerText || "",
-              level: Number(heading.tagName.replace("H", ""))
-            }));
+          activeDocHeadings = collectedHeadings;
           const doc = DOCS.find((d) => d.file === file);
           if (doc) {
             doc.headings = activeDocHeadings;
