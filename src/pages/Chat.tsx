@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useSettingsStore } from "@/hooks/useSettingsStore";
 import { ContentLayout } from "@/components/ContentLayout";
 import { useSidebar } from "@/components/ui/sidebar";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -23,7 +24,16 @@ const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 무엇이든 좋습니다. 최근에 겪은 일, 반복되는 고민, 혹은 막연한 불안... 어떤 것이든 환영합니다.`;
 
 export default function Chat() {
-  const { activeConversationId, getActiveMessages, addMessage, saveInsight } = useChatStore();
+  const { conversationId: routeConversationId } = useParams<{ conversationId?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    activeConversationId,
+    setActiveConversation,
+    getActiveMessages,
+    addMessage,
+    saveInsight,
+  } = useChatStore();
 
   const activeConversation = useChatStore((s) =>
     s.activeConversationId ? s.conversations.find((c) => c.id === s.activeConversationId) : undefined
@@ -36,14 +46,58 @@ export default function Chat() {
   const [isTyping, setIsTyping] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
   const messages = getActiveMessages();
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (messages.length > 0) setShowWelcome(false);
   }, [messages.length]);
 
   useEffect(() => {
+    if (routeConversationId && routeConversationId !== activeConversationId) {
+      setActiveConversation(routeConversationId);
+    } else if (!routeConversationId && activeConversationId) {
+      navigate(`/chat/${activeConversationId}`, { replace: true });
+    }
+  }, [routeConversationId, activeConversationId, setActiveConversation, navigate]);
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    if (!location.hash) return;
+    if (!location.hash.startsWith("#message-")) return;
+    const targetId = location.hash.replace("#message-", "");
+    setPendingScrollTarget(targetId);
+  }, [location.hash]);
+
+  useEffect(() => {
+    if (!pendingScrollTarget) return;
+    const exists = messages.some((m) => m.id === pendingScrollTarget);
+    if (!exists) return;
+
+    const element = document.getElementById(`message-${pendingScrollTarget}`);
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedMessageId(pendingScrollTarget);
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedMessageId(null);
+      highlightTimeoutRef.current = null;
+    }, 2500);
+    setPendingScrollTarget(null);
+  }, [pendingScrollTarget, messages]);
+
+  useEffect(() => () => {
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (activeConversation?.mode === "CUSTOM") setShowWelcome(false);
@@ -328,6 +382,7 @@ export default function Chat() {
             <ChatMessage
               key={message.id}
               message={message}
+              highlighted={message.id === highlightedMessageId}
               onSave={handleSaveInsight}
               onCopy={handleCopy}
               onLikeToggle={handleLikeToggle}
