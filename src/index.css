@@ -315,6 +315,28 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  .mask-fade-bottom {
+    mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+  }
+
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-sidebar-border/70;
+  }
+
+  .thin-scrollbar:hover::-webkit-scrollbar-thumb {
+    @apply bg-sidebar-border;
+  }
+
+  .thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--sidebar-border)) transparent;
+  }
+
   .glow-text {
     text-shadow: 0 0 20px hsl(var(--primary) / 0.5);
   }

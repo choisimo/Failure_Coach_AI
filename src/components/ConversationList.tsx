@@ -1,6 +1,8 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface Conversation {
@@ -25,10 +27,49 @@ export const ConversationList = ({
   activeId,
   onSelect,
 }: ConversationListProps) => {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const updateScrollState = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const scrollable = viewport.scrollHeight - viewport.clientHeight > 1;
+    const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 1;
+
+    setIsScrollable(scrollable);
+    setIsAtBottom(!scrollable || atBottom);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+  }, [conversations, updateScrollState]);
+
+  useEffect(() => {
+    const handleResize = () => updateScrollState();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [updateScrollState]);
+
+  const handleScroll: React.UIEventHandler<HTMLDivElement> = (event) => {
+    const target = event.currentTarget;
+    const atBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 1;
+    setIsAtBottom(atBottom);
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1">
-        <div className="space-y-3 px-2.5 py-3 sm:px-3.5">
+      <ScrollArea
+        className="flex-1"
+        viewportRef={viewportRef}
+        viewportOnScroll={handleScroll}
+        viewportClassName={cn(
+          "pr-1 thin-scrollbar",
+          isScrollable && !isAtBottom && "mask-fade-bottom"
+        )}
+      >
+        <div className="relative space-y-4 px-2.5 py-3 sm:px-3.5">
 
           {conversations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">
@@ -39,45 +80,52 @@ export const ConversationList = ({
           ) : (
             conversations.map((conv) => (
               <button
+                type="button"
                 key={conv.id}
                 onClick={() => onSelect(conv.id)}
                 className={cn(
-                  "w-full text-left rounded-2xl border transition-all",
-                  "bg-card hover:bg-sidebar-accent border-border",
-                  "shadow-sm hover:shadow-lg hover:-translate-y-[1px]",
-                  activeId === conv.id && "ring-2 ring-primary/40 border-primary/40"
+                  "group relative w-full overflow-hidden rounded-2xl border border-border/60 bg-card/80 text-left transition-colors duration-200",
+                  "hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                  activeId === conv.id && "border-primary/50 bg-sidebar-accent/80 shadow-md"
                 )}
               >
-                <div className="p-3 flex items-start gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                {activeId === conv.id && <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15">
                     <MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold leading-tight truncate" title={conv.title}>
-                          {conv.title}
-                        </p>
-                        {conv.personaTitle && (
-                          <p className="text-[11px] text-muted-foreground truncate" title={conv.personaTitle}>
-                            {conv.personaTitle}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="flex-1 truncate text-sm font-semibold leading-tight" title={conv.title}>
+                            {conv.title}
                           </p>
-                        )}
-                      </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
+                          {conv.title}
+                        </TooltipContent>
+                      </Tooltip>
+                      <time className="shrink-0 text-[11px] text-muted-foreground/70">
+                        {conv.timestamp.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                      </time>
                       {conv.mode === "CUSTOM" && (
-                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">커스텀</Badge>
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap text-[10px]">커스텀</Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground/90 mt-2 line-clamp-2 leading-relaxed" title={conv.lastMessage}>
-                      {conv.lastMessage || "대화가 시작되지 않았습니다."}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground/70 mt-2">
-                      {conv.timestamp.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                    </p>
+                    {conv.personaTitle && (
+                      <p className="mt-1 truncate text-[11px] text-muted-foreground" title={conv.personaTitle}>
+                        {conv.personaTitle}
+                      </p>
+                    )}
                   </div>
                 </div>
               </button>
             ))
+          )}
+
+          {isScrollable && !isAtBottom && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-sidebar" aria-hidden="true" />
           )}
         </div>
       </ScrollArea>
