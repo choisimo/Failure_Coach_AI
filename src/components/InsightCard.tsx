@@ -2,7 +2,9 @@ import { MessageSquare, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Textarea } from "./ui/textarea";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { cn } from "@/lib/utils";
 
 export interface Insight {
   id: string;
@@ -28,6 +30,39 @@ export const InsightCard = ({
 }: InsightCardProps) => {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(insight.note || "");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  const COLLAPSED_MAX_HEIGHT = 168; // ≈7 lines at default line height
+
+  const evaluateOverflow = useCallback(() => {
+    const element = contentRef.current;
+    if (!element) return;
+
+    const scrollHeight = element.scrollHeight;
+    setIsOverflowing(scrollHeight > COLLAPSED_MAX_HEIGHT + 4);
+  }, [COLLAPSED_MAX_HEIGHT]);
+
+  useEffect(() => {
+    evaluateOverflow();
+  }, [insight.content, evaluateOverflow]);
+
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      evaluateOverflow();
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [evaluateOverflow]);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [insight.id]);
 
   const handleSaveNote = () => {
     onUpdateNote(insight.id, noteValue);
@@ -53,9 +88,29 @@ export const InsightCard = ({
         </Button>
       </div>
 
-      <p className="text-sm leading-relaxed mb-3 text-foreground/90">
-        {insight.content}
-      </p>
+      <div
+        ref={contentRef}
+        className={cn(
+          "relative mb-3 overflow-hidden transition-[max-height] duration-300 ease-in-out",
+          isExpanded ? "max-h-[2000px]" : "max-h-[168px]"
+        )}
+      >
+        <MarkdownRenderer content={insight.content} className="text-sm leading-relaxed text-foreground/90" />
+        {!isExpanded && isOverflowing && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-card" />
+        )}
+      </div>
+
+      {isOverflowing && (
+        <button
+          type="button"
+          className="ml-auto mb-3 text-xs font-medium text-primary hover:underline"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          aria-expanded={isExpanded}
+        >
+          {isExpanded ? "접기" : "더 보기"}
+        </button>
+      )}
 
       {isEditingNote ? (
         <div className="space-y-2">
