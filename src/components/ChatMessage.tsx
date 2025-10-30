@@ -1,5 +1,6 @@
 import { Copy, Heart, RefreshCw, Star } from "lucide-react";
 import { Button } from "./ui/button";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -85,7 +86,11 @@ export const ChatMessage = ({ message, onSave, onCopy, onLikeToggle, onRegenerat
             </div>
           )}
 
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+          {isUser ? (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <MarkdownRenderer content={message.content} />
+          )}
 
 
           {/* Hover actions */}
