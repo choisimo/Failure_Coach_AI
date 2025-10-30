@@ -34,7 +34,8 @@ export const InsightCard = ({
   const [isOverflowing, setIsOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
 
-  const COLLAPSED_MAX_HEIGHT = 168; // ≈7 lines at default line height
+  const COLLAPSED_MAX_HEIGHT = 168;
+  const EXPANDED_MAX_HEIGHT = 320;
 
   const evaluateOverflow = useCallback(() => {
     const element = contentRef.current;
@@ -88,83 +89,84 @@ export const InsightCard = ({
         </Button>
       </div>
 
-      <div
-        ref={contentRef}
-        className={cn(
-          "relative mb-3 overflow-hidden transition-[max-height] duration-300 ease-in-out",
-          isExpanded ? "max-h-[2000px]" : "max-h-[168px]"
-        )}
-      >
-        <MarkdownRenderer content={insight.content} className="text-sm leading-relaxed text-foreground/90" />
-        {!isExpanded && isOverflowing && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-card" />
+      <div className="flex flex-col gap-3">
+        <div
+          ref={contentRef}
+          className={cn(
+            "relative overflow-hidden rounded-xl border border-border/40 bg-card/60",
+            "transition-[max-height] duration-300 ease-in-out",
+            isExpanded ? `max-h-[${EXPANDED_MAX_HEIGHT}px]` : `max-h-[${COLLAPSED_MAX_HEIGHT}px]`
+          )}
+        >
+          <div className={cn("thin-scrollbar", isExpanded ? "overflow-y-auto" : "overflow-hidden")}
+          >
+            <div className="p-3">
+              <MarkdownRenderer content={insight.content} className="text-sm leading-relaxed text-foreground/90" />
+            </div>
+          </div>
+          {!isExpanded && isOverflowing && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent via-card/60 to-card" />
+          )}
+        </div>
+
+        {isOverflowing && (
+          <button
+            type="button"
+            className="ml-auto text-xs font-medium text-primary hover:underline"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? "접기" : "더 보기"}
+          </button>
         )}
       </div>
 
-      {isOverflowing && (
-        <button
-          type="button"
-          className="ml-auto mb-3 text-xs font-medium text-primary hover:underline"
-          onClick={() => setIsExpanded((prev) => !prev)}
-          aria-expanded={isExpanded}
-        >
-          {isExpanded ? "접기" : "더 보기"}
-        </button>
-      )}
-
-      {isEditingNote ? (
-        <div className="space-y-2">
-          <Textarea
-            value={noteValue}
-            onChange={(e) => setNoteValue(e.target.value)}
-            placeholder="이 통찰에 대한 메모를 추가하세요..."
-            className="min-h-[80px] text-sm"
-          />
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleSaveNote}>
-              저장
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setIsEditingNote(false);
-                setNoteValue(insight.note || "");
-              }}
-            >
-              취소
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {insight.note && (
-            <div className="p-2 bg-accent/10 rounded-lg mb-2">
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                {insight.note}
-              </p>
+      <div className="border-t border-border/40 pt-3 mt-4 flex flex-col gap-3">
+        {isEditingNote ? (
+          <div className="space-y-2">
+            <Textarea
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              placeholder="이 통찰에 대한 메모를 추가하세요..."
+              className="min-h-[80px] text-sm"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveNote}>
+                저장
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsEditingNote(false)}>
+                취소
+              </Button>
             </div>
-          )}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditingNote(true)}
-              className="text-xs"
-            >
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {insight.note ? (
+              <div className="rounded-lg bg-muted/10 p-3 text-sm text-muted-foreground">
+                <p className="whitespace-pre-wrap">{insight.note}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">메모가 없습니다. 필요한 참고 사항을 저장해보세요.</p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-auto flex flex-wrap gap-2 justify-end">
+          {isEditingNote ? null : (
+            <Button variant="secondary" size="sm" onClick={() => setIsEditingNote(true)}>
               {insight.note ? "메모 수정" : "메모 추가"}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate(insight.messageId)}
-              className="text-xs"
-            >
-              원본 대화 보기
+          )}
+          <Button variant="outline" size="sm" onClick={() => onNavigate(insight.messageId)}>
+            원본 대화 보기
+          </Button>
+          {!isEditingNote && (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80" onClick={() => onDelete(insight.id)}>
+              삭제
             </Button>
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      </div>
     </Card>
   );
 };
