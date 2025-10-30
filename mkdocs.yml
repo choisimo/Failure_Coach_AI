@@ -1,0 +1,50 @@
+site_name: Self Insight Chat Wiki
+site_description: 마음 거울 프로젝트 위키
+site_url: https://choisimo.github.io/Failure_Coach_AI/wiki/
+repo_url: https://github.com/choisimo/Failure_Coach_AI
+repo_name: Failure_Coach_AI
+site_dir: site
+nav:
+  - 홈: index.md
+  - 제품 기획:
+      - IRL 하이브리드 사양: irl-hybrid-spec.md
+      - IRL 하이브리드 백로그: irl-hybrid-backlog.md
+      - IRL 리팩터링 PRD: irl-refactor-prd.md
+  - API:
+      - IRL 하이브리드 OpenAPI: api/irl-hybrid-openapi.yaml
+  - 텔레메트리:
+      - 수집 스키마: telemetry/irl-telemetry-schema.md
+  - 참고 자료:
+      - 위키 인덱스 (HTML): wiki-index.html
+      - 프로젝트 README: ../README.md
+theme:
+  name: material
+  language: ko
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - toc.integrate
+    - content.code.copy
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - footnotes
+  - tables
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+plugins:
+  - search
+  - mkdocs-minify-plugin
+  - mkdocs-git-revision-date-localized-plugin:
+      fallback_to_build_date: true
+      timeago: true
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/choisimo
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
