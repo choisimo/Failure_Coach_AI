@@ -7,11 +7,12 @@ import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
 import { requestGatewayCompletion, getSessionMessages, extractIRLMetadata, sendFeedbackReliable } from "@/lib/aiGateway";
-import { computeHistoryHash } from "@/lib/utils";
+import { cn, computeHistoryHash } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/hooks/useSettingsStore";
 import { ContentLayout } from "@/components/ContentLayout";
+import { useSidebar } from "@/components/ui/sidebar";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -270,11 +271,17 @@ export default function Chat() {
   }
 
   const isCustom = activeConversation?.mode === "CUSTOM";
+  const { state, isMobile } = useSidebar();
+  const isSidebarExpanded = state === "expanded";
+  const layoutPadding = cn(
+    "transition-[padding] duration-300",
+    !isMobile && isSidebarExpanded ? "lg:pl-12 xl:pl-16" : !isMobile ? "lg:pl-10" : ""
+  );
 
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="border-b border-border bg-background/95">
-        <ContentLayout className="py-4">
+        <ContentLayout className={cn(layoutPadding, "py-4")}> 
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">대화</h1>
             {isCustom && (
@@ -304,7 +311,7 @@ export default function Chat() {
       </div>
 
       <ScrollArea className="flex-1">
-        <ContentLayout className="py-3 md:py-6">
+        <ContentLayout className={cn(layoutPadding, "py-3 md:py-6")}>
           {showWelcome && !isCustom && messages.length === 0 && (
             <div className="mb-8 p-6 rounded-2xl bg-card border border-border shadow-sm animate-fade-in">
               <div className="flex items-start gap-3">

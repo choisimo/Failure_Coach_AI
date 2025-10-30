@@ -28,7 +28,7 @@ export const ConversationList = ({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">
+        <div className="space-y-3 px-2.5 py-3 sm:px-3.5">
 
           {conversations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">
