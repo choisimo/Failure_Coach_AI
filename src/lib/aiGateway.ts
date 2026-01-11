@@ -140,37 +140,52 @@ export async function getSessionMessages(sessionId: string, signal?: AbortSignal
     throw new Error("Message list API returned non-JSON response");
   });
 
-  const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.messages) ? data.messages : Array.isArray(data?.data) ? data.data : [];
+  const list: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.messages) ? data.messages : Array.isArray(data?.data) ? data.data : [];
   return list as GatewaySessionMessage[];
 }
 
-function extractReply(data: any): string | undefined {
+interface AnyRecord {
+  [key: string]: unknown;
+}
+
+function extractReply(data: unknown): string | undefined {
+  const d = data as AnyRecord | null | undefined;
   // Common shapes first
-  if (typeof data?.reply === "string") return data.reply;
-  if (typeof data?.content === "string") return data.content;
-  if (typeof data?.result === "string") return data.result;
+  if (typeof d?.reply === "string") return d.reply;
+  if (typeof d?.content === "string") return d.content;
+  if (typeof d?.result === "string") return d.result;
 
   // OpenAI-like
-  const openai = data?.choices?.[0];
-  if (openai?.message?.content) return openai.message.content;
+  const choices = d?.choices as AnyRecord[] | undefined;
+  const openai = Array.isArray(choices) ? choices[0] : undefined;
+  const openaiMessage = openai?.message as AnyRecord | undefined;
+  if (typeof openaiMessage?.content === "string") return openaiMessage.content;
   if (typeof openai?.text === "string") return openai.text;
 
   // message object
-  if (typeof data?.message?.content === "string") return data.message.content;
+  const messageObj = d?.message as AnyRecord | undefined;
+  if (typeof messageObj?.content === "string") return messageObj.content;
 
   // arrays of messages or parts
-  const messages = Array.isArray(data?.messages) ? data.messages : Array.isArray(data?.data?.messages) ? data.data.messages : undefined;
+  const dataData = d?.data as AnyRecord | undefined;
+  const messages = Array.isArray(d?.messages) ? (d.messages as AnyRecord[]) : Array.isArray(dataData?.messages) ? (dataData.messages as AnyRecord[]) : undefined;
   if (Array.isArray(messages) && messages.length) {
-    const assistant = messages.find((m: any) => m?.role === "assistant" && typeof m?.content === "string");
-    if (assistant?.content) return assistant.content;
-    const firstWithContent = messages.find((m: any) => typeof m?.content === "string");
-    if (firstWithContent?.content) return firstWithContent.content;
+    const assistant = messages.find((m) => m?.role === "assistant" && typeof m?.content === "string");
+    if (typeof assistant?.content === "string") return assistant.content;
+    const firstWithContent = messages.find((m) => typeof m?.content === "string");
+    if (typeof firstWithContent?.content === "string") return firstWithContent.content;
   }
 
-  const parts = Array.isArray(data?.parts) ? data.parts : Array.isArray(data?.message?.parts) ? data.message.parts : undefined;
+  const messageParts = messageObj?.parts as unknown[] | undefined;
+  const parts = Array.isArray(d?.parts) ? (d.parts as unknown[]) : Array.isArray(messageParts) ? messageParts : undefined;
   if (Array.isArray(parts) && parts.length) {
     const textParts = parts
-      .map((p: any) => (typeof p === "string" ? p : typeof p?.text === "string" ? p.text : undefined))
+      .map((p) => {
+        if (typeof p === "string") return p;
+        const pObj = p as AnyRecord | null | undefined;
+        if (typeof pObj?.text === "string") return pObj.text;
+        return undefined;
+      })
       .filter(Boolean);
     if (textParts.length) return textParts.join("\n\n");
   }
@@ -191,7 +206,7 @@ export async function requestGatewayCompletion(payload: GatewayPayload, signal?:
     throw new Error("No user message content to send");
   }
 
-  const meta = (metadata as any) || {};
+  const meta = (metadata as AnyRecord) || {};
   const conversationId = meta.conversationId as string | undefined;
   const mode = meta.sessionMode as ("GUIDED" | "CUSTOM" | undefined);
   const customSystemPrompt = meta.customSystemPrompt as string | undefined;
@@ -276,7 +291,7 @@ export async function listPolicies(signal?: AbortSignal): Promise<IRLPolicyInfo[
   const res = await fetch(endpoint, { headers, method: "GET", signal });
   if (!res.ok) throw new Error(`Policies error: ${res.status} ${res.statusText}`);
   const data = await res.json().catch(() => []);
-  const arr: any[] = Array.isArray(data)
+  const arr: AnyRecord[] = Array.isArray(data)
     ? data
     : Array.isArray(data?.policies)
     ? data.policies
@@ -329,38 +344,46 @@ export type IRLMetadata = {
   reason?: string;
   traceId?: string;
   candidateId?: string;
-  candidateSet?: any[];
-  [key: string]: any;
+  candidateSet?: AnyRecord[];
+  [key: string]: unknown;
 };
 
 export function extractIRLMetadata(raw: unknown): IRLMetadata {
-  const r: any = raw || {};
-  const candidates: any[] = [];
+  const r = (raw || {}) as AnyRecord;
+  const candidates: AnyRecord[] = [];
   // Ordered search for metadata across common shapes
+  const messageObj = r?.message as AnyRecord | undefined;
+  const messageData = messageObj?.data as AnyRecord | undefined;
+  const dataObj = r?.data as AnyRecord | undefined;
+  const rMetadata = r?.metadata as AnyRecord | undefined;
+  const messageMetadata = messageObj?.metadata as AnyRecord | undefined;
+
   const metaCandidate =
-    r?.metadata ||
-    r?.message?.metadata ||
-    r?.message?.data?.metadata ||
-    r?.data?.metadata ||
-    r?.metadata?.chosen ||
-    r?.message?.metadata?.chosen ||
+    rMetadata ||
+    messageMetadata ||
+    messageData?.metadata ||
+    dataObj?.metadata ||
+    rMetadata?.chosen ||
+    messageMetadata?.chosen ||
     undefined;
 
-  const m: any = (metaCandidate && typeof metaCandidate === "object") ? metaCandidate : {};
-  const chosen: any = m?.chosen && typeof m.chosen === "object" ? m.chosen : undefined;
-  const scores: any = m?.scores && typeof m.scores === "object" ? m.scores : chosen?.scores || {};
+  const m = (metaCandidate && typeof metaCandidate === "object") ? (metaCandidate as AnyRecord) : {};
+  const chosen = (m?.chosen && typeof m.chosen === "object") ? (m.chosen as AnyRecord) : undefined;
+  const mScores = m?.scores as AnyRecord | undefined;
+  const chosenScores = chosen?.scores as AnyRecord | undefined;
+  const scores = (mScores && typeof mScores === "object") ? mScores : (chosenScores || {});
 
-  const pick = (obj: any, keys: string[]) => keys.map((k) => obj?.[k]).find((v) => v != null);
+  const pick = (obj: AnyRecord | undefined, keys: string[]) => keys.map((k) => obj?.[k]).find((v) => v != null);
 
   const result: IRLMetadata = {
-    policyId: pick(m, ["policyId", "policy_id"]) ?? pick(chosen || {}, ["policyId", "policy_id"]) ?? undefined,
-    irlScore: (pick(m, ["irlScore"]) ?? pick(scores, ["irl"]) ?? pick(chosen || {}, ["irlScore"])) as number | undefined,
-    safetyScore: (pick(m, ["safetyScore"]) ?? pick(scores, ["safety"]) ?? pick(chosen || {}, ["safetyScore"])) as number | undefined,
-    rank: (pick(m, ["rank"]) ?? pick(chosen || {}, ["rank"])) as number | undefined,
-    reason: (pick(m, ["reason"]) ?? pick(chosen || {}, ["reason"])) as string | undefined,
-    traceId: (pick(m, ["traceId", "trace_id", "traceID"]) ?? pick(chosen || {}, ["traceId", "trace_id", "traceID"])) as string | undefined,
-    candidateId: (pick(m, ["candidateId"]) ?? pick(chosen || {}, ["id", "candidateId"])) as string | undefined,
-    candidateSet: Array.isArray(m?.candidates) ? m.candidates : Array.isArray(r?.candidates) ? r.candidates : candidates,
+    policyId: (pick(m, ["policyId", "policy_id"]) ?? pick(chosen, ["policyId", "policy_id"]) ?? undefined) as string | undefined,
+    irlScore: (pick(m, ["irlScore"]) ?? pick(scores, ["irl"]) ?? pick(chosen, ["irlScore"])) as number | undefined,
+    safetyScore: (pick(m, ["safetyScore"]) ?? pick(scores, ["safety"]) ?? pick(chosen, ["safetyScore"])) as number | undefined,
+    rank: (pick(m, ["rank"]) ?? pick(chosen, ["rank"])) as number | undefined,
+    reason: (pick(m, ["reason"]) ?? pick(chosen, ["reason"])) as string | undefined,
+    traceId: (pick(m, ["traceId", "trace_id", "traceID"]) ?? pick(chosen, ["traceId", "trace_id", "traceID"])) as string | undefined,
+    candidateId: (pick(m, ["candidateId"]) ?? pick(chosen, ["id", "candidateId"])) as string | undefined,
+    candidateSet: Array.isArray(m?.candidates) ? (m.candidates as AnyRecord[]) : Array.isArray(r?.candidates) ? (r.candidates as AnyRecord[]) : candidates,
   };
 
   return result;

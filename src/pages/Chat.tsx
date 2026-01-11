@@ -14,6 +14,7 @@ import { useSettingsStore } from "@/hooks/useSettingsStore";
 import { ContentLayout } from "@/components/ContentLayout";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { MessageSquare, Sparkles } from "lucide-react";
 
 const WELCOME_MESSAGE = `안녕하세요. 저는 '마음 거울'입니다.
 
@@ -103,7 +104,9 @@ export default function Chat() {
     if (activeConversation?.mode === "CUSTOM") setShowWelcome(false);
   }, [activeConversation?.mode]);
 
-  // Rehydrate CUSTOM mode from existing session metadata
+  const conversationPersonaTitle = activeConversation?.personaTitle;
+  const conversationCustomPrompt = activeConversation?.customPrompt;
+
   useEffect(() => {
     const sessionId = activeConversation?.sessionId;
     if (!sessionId || !activeConversation?.id) return;
@@ -112,13 +115,13 @@ export default function Chat() {
     (async () => {
       try {
         const list = await getSessionMessages(sessionId, controller.signal);
-        const first: any = Array.isArray(list) ? list[0] : undefined;
-        const metadata: any = (first && typeof first === "object" ? first.metadata : undefined) || {};
-        const isSeed = Boolean(first?.noReply) || metadata?.source === "custom-mode-seed";
+        const first = Array.isArray(list) ? list[0] : undefined;
+        const metadata = (first && typeof first === "object" ? (first as Record<string, unknown>).metadata : undefined) as Record<string, unknown> | undefined ?? {};
+        const isSeed = Boolean((first as Record<string, unknown>)?.noReply) || metadata?.source === "custom-mode-seed";
         if (isSeed) {
-          const patch: any = { mode: "CUSTOM" as const };
-          if (metadata?.personaTitle && !activeConversation?.personaTitle) patch.personaTitle = metadata.personaTitle;
-          if (metadata?.customSystemPrompt && !activeConversation?.customPrompt) patch.customPrompt = metadata.customSystemPrompt;
+          const patch: Partial<{ mode: "CUSTOM"; personaTitle: string; customPrompt: string }> = { mode: "CUSTOM" as const };
+          if (metadata?.personaTitle && !conversationPersonaTitle) patch.personaTitle = String(metadata.personaTitle);
+          if (metadata?.customSystemPrompt && !conversationCustomPrompt) patch.customPrompt = String(metadata.customSystemPrompt);
           useChatStore.getState().updateConversation(activeConversation.id, patch);
           setShowWelcome(false);
         }
@@ -128,7 +131,7 @@ export default function Chat() {
     })();
 
     return () => controller.abort();
-  }, [activeConversation?.sessionId, activeConversation?.id]);
+  }, [activeConversation?.sessionId, activeConversation?.id, conversationPersonaTitle, conversationCustomPrompt]);
 
   const handleSend = async (content: string) => {
     if (!activeConversationId) return;
@@ -161,11 +164,9 @@ export default function Chat() {
         },
       });
 
-
-      // Persist sessionId after first creation
-      const createdId = (raw as any)?.sessionId || (raw as any)?.sessionCreate?.id;
+      const createdId = (raw as Record<string, unknown>)?.sessionId || ((raw as Record<string, unknown>)?.sessionCreate as Record<string, unknown>)?.id;
       if (createdId) {
-        useChatStore.getState().setConversationSession(activeConversationId, createdId);
+        useChatStore.getState().setConversationSession(activeConversationId, String(createdId));
       }
 
       const parsed = extractIRLMetadata(raw);
@@ -226,35 +227,34 @@ export default function Chat() {
     const next = !msg.liked;
     useChatStore.getState().updateMessage(activeConversationId, messageId, { liked: next });
 
-      // Fire-and-forget feedback (non-blocking) with retry + warn
-      try {
-        const conv = activeConversation;
-        const traceId = msg.traceId;
-        const candidateId = msg.candidateId;
-        const policyId = msg.policyId;
-        const scores = {
-          irl: msg.irlScore,
-          safety: msg.safetyScore,
-          rank: msg.rank,
-        } as Record<string, unknown>;
-        await sendFeedbackReliable({
-          conversationId: activeConversationId,
-          sessionId: conv?.sessionId,
-          messageId,
-          candidateId,
-          action: next ? "like" : "unlike",
-          traceId,
-          policyId,
-          scores,
-        }, {
-          onFinalFailure: () => {
-            console.warn("IRL feedback permanently failed for message", { messageId, traceId, candidateId });
-            toast({ title: "피드백 전송 실패", description: "재시도에도 전송되지 않았습니다. 좋아요 상태는 유지됩니다.", variant: "destructive" });
-          }
-        });
-      } catch (err) {
-        console.warn("IRL feedback error", err);
-      }
+    try {
+      const conv = activeConversation;
+      const traceId = msg.traceId;
+      const candidateId = msg.candidateId;
+      const policyId = msg.policyId;
+      const scores = {
+        irl: msg.irlScore,
+        safety: msg.safetyScore,
+        rank: msg.rank,
+      } as Record<string, unknown>;
+      await sendFeedbackReliable({
+        conversationId: activeConversationId,
+        sessionId: conv?.sessionId,
+        messageId,
+        candidateId,
+        action: next ? "like" : "unlike",
+        traceId,
+        policyId,
+        scores,
+      }, {
+        onFinalFailure: () => {
+          console.warn("IRL feedback permanently failed for message", { messageId, traceId, candidateId });
+          toast({ title: "피드백 전송 실패", description: "재시도에도 전송되지 않았습니다. 좋아요 상태는 유지됩니다.", variant: "destructive" });
+        }
+      });
+    } catch (err) {
+      console.warn("IRL feedback error", err);
+    }
   };
 
   const handleRegenerate = async (assistantMessageId: string) => {
@@ -263,7 +263,6 @@ export default function Chat() {
     const idx = list.findIndex((m) => m.id === assistantMessageId);
     if (idx === -1) return;
 
-    // Find the nearest previous user message before this assistant message
     let lastUserIndex = -1;
     for (let i = idx - 1; i >= 0; i--) {
       if (list[i].role === "user") {
@@ -271,12 +270,11 @@ export default function Chat() {
         break;
       }
     }
-    if (lastUserIndex === -1) return; // nothing to regenerate against
+    if (lastUserIndex === -1) return;
 
     setIsTyping(true);
 
-    // Build history up to this assistant message
-    const slice = list.slice(0, idx); // up to but not including the assistant message
+    const slice = list.slice(0, idx);
     const history = slice.map((m) => ({ role: m.role, content: m.content })) as Array<{
       role: Message["role"]; content: string;
     }>;
@@ -310,69 +308,84 @@ export default function Chat() {
     }
   };
 
+  const { state, isMobile } = useSidebar();
+  const isSidebarExpanded = state === "expanded";
+  const layoutPadding = cn(
+    "transition-[padding] duration-300",
+    !isMobile && isSidebarExpanded ? "lg:pl-8 xl:pl-12" : !isMobile ? "lg:pl-6" : ""
+  );
+
   if (!activeConversationId) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">💭</span>
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/10">
+            <MessageSquare className="w-9 h-9 text-primary" />
           </div>
-          <h2 className="text-2xl font-semibold mb-2 glow-text">대화를 시작해보세요</h2>
-          <p className="text-muted-foreground mb-6">새로운 대화를 시작하거나 과거 대화를 선택해주세요.</p>
+          <h2 className="text-2xl font-semibold mb-3 text-foreground">대화를 시작해보세요</h2>
+          <p className="text-muted-foreground leading-relaxed">
+            새로운 대화를 시작하거나<br />
+            사이드바에서 이전 대화를 선택해주세요.
+          </p>
         </div>
       </div>
     );
   }
 
   const isCustom = activeConversation?.mode === "CUSTOM";
-  const { state, isMobile } = useSidebar();
-  const isSidebarExpanded = state === "expanded";
-  const layoutPadding = cn(
-    "transition-[padding] duration-300",
-    !isMobile && isSidebarExpanded ? "lg:pl-12 xl:pl-16" : !isMobile ? "lg:pl-10" : ""
-  );
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      <div className="border-b border-border bg-background/95">
+      <header className="border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-10">
         <ContentLayout className={cn(layoutPadding, "py-4")}> 
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">대화</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-foreground">대화</h1>
             {isCustom && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="ml-2">
-                    커스텀 모드: {activeConversation?.personaTitle || "커스텀 세션"}
+                  <Badge variant="secondary" className="font-medium">
+                    {activeConversation?.personaTitle || "커스텀 세션"}
                   </Badge>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
-                  {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
+                <TooltipContent side="bottom" align="start" className="max-w-md">
+                  <p className="text-xs whitespace-pre-wrap leading-relaxed">
+                    {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             )}
             {irlEnabled && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="ml-2">전문가 가이드</Badge>
+                  <Badge variant="outline" className="font-medium text-primary border-primary/30">
+                    전문가 가이드
+                  </Badge>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="max-w-md whitespace-pre-wrap">
-                  IRL 정책으로 응답을 재랭킹합니다.\n정책 버전: {irlPolicyVersion}
+                <TooltipContent side="bottom" align="start" className="max-w-xs">
+                  <p className="text-xs">IRL 정책으로 응답을 재랭킹합니다.</p>
+                  <p className="text-xs text-muted-foreground mt-1">정책 버전: {irlPolicyVersion}</p>
                 </TooltipContent>
               </Tooltip>
             )}
           </div>
         </ContentLayout>
-      </div>
+      </header>
 
       <ScrollArea className="flex-1">
-        <ContentLayout className={cn(layoutPadding, "py-3 md:py-6")}>
+        <ContentLayout className={cn(layoutPadding, "py-6")}>
           {showWelcome && !isCustom && messages.length === 0 && (
-            <div className="mb-8 p-6 rounded-2xl bg-card border border-border shadow-sm animate-fade-in">
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">💭</div>
-                <div className="flex-1">
-                  <h2 className="text-base font-semibold glow-text mb-2">마음 거울에 오신 것을 환영합니다</h2>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{WELCOME_MESSAGE}</p>
+            <div className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border shadow-sm animate-fade-in">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-xl bg-primary/[0.15] flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold text-foreground mb-3">
+                    마음 거울에 오신 것을 환영합니다
+                  </h2>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/80">
+                    {WELCOME_MESSAGE}
+                  </p>
                 </div>
               </div>
             </div>

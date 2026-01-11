@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface Conversation {
@@ -59,7 +58,7 @@ export const ConversationList = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <nav className="flex flex-col h-full" aria-label="대화 목록">
       <ScrollArea
         className="flex-1"
         viewportRef={viewportRef}
@@ -69,66 +68,101 @@ export const ConversationList = ({
           isScrollable && !isAtBottom && "mask-fade-bottom"
         )}
       >
-        <div className="relative space-y-4 px-2.5 py-3 sm:px-3.5">
-
+        <ul className="relative space-y-2 px-1 py-2">
           {conversations.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm">
-              <img src="/placeholder.svg" alt="empty" className="mx-auto mb-3 h-12 w-12 opacity-60" />
-              <p className="font-medium">아직 대화가 없습니다</p>
-              <p className="text-xs mt-1">왼쪽 하단의 새 대화 버튼으로 시작해보세요</p>
-            </div>
+            <li className="text-center py-10 px-4">
+              <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                <MessageSquare className="h-5 w-5 text-muted-foreground/60" aria-hidden="true" />
+              </div>
+              <p className="text-sm font-medium text-foreground/80">아직 대화가 없습니다</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                아래의 새 대화 버튼으로 시작해보세요
+              </p>
+            </li>
           ) : (
             conversations.map((conv) => (
-              <button
-                type="button"
-                key={conv.id}
-                onClick={() => onSelect(conv.id)}
-                className={cn(
-                  "group relative w-full overflow-hidden rounded-2xl border border-border/60 bg-card/80 text-left transition-colors duration-200",
-                  "hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                  activeId === conv.id && "border-primary/50 bg-sidebar-accent/80 shadow-md"
-                )}
-              >
-                {activeId === conv.id && <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />}
-                <div className="flex items-start gap-3 px-4 py-3">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15">
-                    <MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <p className="flex-1 truncate text-sm font-semibold leading-tight" title={conv.title}>
-                            {conv.title}
-                          </p>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
-                          {conv.title}
-                        </TooltipContent>
-                      </Tooltip>
-                      <time className="shrink-0 text-[11px] text-muted-foreground/70">
-                        {conv.timestamp.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                      </time>
-                      {conv.mode === "CUSTOM" && (
-                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap text-[10px]">커스텀</Badge>
+              <li key={conv.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(conv.id)}
+                  className={cn(
+                    "group relative w-full text-left rounded-xl border transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    activeId === conv.id
+                      ? "bg-primary/[0.08] border-primary/30 shadow-sm"
+                      : "bg-card/50 border-border/50 hover:bg-sidebar-accent/60 hover:border-border"
+                  )}
+                  aria-current={activeId === conv.id ? "true" : undefined}
+                >
+                  {activeId === conv.id && (
+                    <span 
+                      className="absolute inset-y-2 left-0 w-1 rounded-full bg-primary" 
+                      aria-hidden="true" 
+                    />
+                  )}
+                  <div className="flex items-start gap-3 px-3 py-3">
+                    <div 
+                      className={cn(
+                        "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors",
+                        activeId === conv.id ? "bg-primary/[0.15]" : "bg-muted/50"
                       )}
+                      aria-hidden="true"
+                    >
+                      <MessageSquare className={cn(
+                        "h-4 w-4",
+                        activeId === conv.id ? "text-primary" : "text-muted-foreground"
+                      )} />
                     </div>
-                    {conv.personaTitle && (
-                      <p className="mt-1 truncate text-[11px] text-muted-foreground" title={conv.personaTitle}>
-                        {conv.personaTitle}
-                      </p>
-                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p 
+                          className={cn(
+                            "flex-1 truncate text-sm leading-tight",
+                            activeId === conv.id ? "font-semibold text-foreground" : "font-medium text-foreground/90"
+                          )}
+                        >
+                          {conv.title}
+                        </p>
+                        {conv.mode === "CUSTOM" && (
+                          <Badge 
+                            variant="secondary" 
+                            className="shrink-0 text-[10px] px-1.5 py-0 h-5"
+                          >
+                            커스텀
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {conv.personaTitle && (
+                          <p 
+                            className="truncate text-[11px] text-muted-foreground flex-1" 
+                            title={conv.personaTitle}
+                          >
+                            {conv.personaTitle}
+                          </p>
+                        )}
+                        <time 
+                          className="shrink-0 text-[11px] text-muted-foreground/70"
+                          dateTime={conv.timestamp.toISOString()}
+                        >
+                          {conv.timestamp.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                        </time>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </li>
             ))
           )}
+        </ul>
 
-          {isScrollable && !isAtBottom && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-sidebar" aria-hidden="true" />
-          )}
-        </div>
+        {isScrollable && !isAtBottom && (
+          <div 
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-sidebar" 
+            aria-hidden="true" 
+          />
+        )}
       </ScrollArea>
-    </div>
+    </nav>
   );
 };

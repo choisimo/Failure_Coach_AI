@@ -14,6 +14,17 @@ export default {
       },
     },
     extend: {
+      spacing: {
+        "message-x": "var(--message-padding-x)",
+        "message-y": "var(--message-padding-y)",
+        "message-gap": "var(--message-gap)",
+        "card": "var(--card-padding)",
+        "card-gap": "var(--card-gap)",
+        "input-h": "var(--input-height)",
+      },
+      maxWidth: {
+        "message": "var(--message-max-width)",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

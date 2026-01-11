@@ -32,7 +32,8 @@ function cyrb53(str: string, seed = 0): string {
 export async function sha256Hex(input: string): Promise<string> {
   const enc = new TextEncoder();
   try {
-    const subtle = (globalThis as any)?.crypto?.subtle as SubtleCrypto | undefined;
+    const globalCrypto = (globalThis as { crypto?: { subtle?: SubtleCrypto } })?.crypto;
+    const subtle = globalCrypto?.subtle;
     if (!subtle) throw new Error("no subtle crypto");
     const data = enc.encode(input);
     const digest = await subtle.digest("SHA-256", data);

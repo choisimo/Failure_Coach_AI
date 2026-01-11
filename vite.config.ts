@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// https://vitejs.dev/config/
 export default defineConfig((configEnv) => {
   const homepage = process.env.npm_package_homepage || "/";
   const url = new URL(homepage, "https://placeholder.local");
@@ -20,6 +19,31 @@ export default defineConfig((configEnv) => {
     resolve: {
       alias: {
         "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "./src"),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("react-dom") || id.includes("react-router")) {
+                return "vendor-react";
+              }
+              if (id.includes("@radix-ui")) {
+                return "vendor-radix";
+              }
+              if (id.includes("lucide-react")) {
+                return "vendor-icons";
+              }
+              if (id.includes("@tanstack/react-query")) {
+                return "vendor-query";
+              }
+              if (id.includes("zustand") || id.includes("clsx") || id.includes("tailwind-merge")) {
+                return "vendor-utils";
+              }
+            }
+          },
+        },
       },
     },
   };

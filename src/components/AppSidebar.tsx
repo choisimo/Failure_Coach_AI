@@ -17,6 +17,7 @@ import { ConversationList, Conversation } from "./ConversationList";
 import { Switch } from "./ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useSettingsStore } from "@/hooks/useSettingsStore";
+import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
   conversations: Conversation[];
@@ -36,36 +37,46 @@ export const AppSidebar = ({
   const { irlEnabled, irlPolicyVersion, setIrlEnabled, setIrlPolicyVersion } = useSettingsStore();
 
   return (
-    <Sidebar className={collapsed ? "w-14" : "w-80"} collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+    <Sidebar className={collapsed ? "w-14" : "w-72"} collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-10 h-10 rounded-xl bg-primary/[0.15] flex items-center justify-center flex-shrink-0"
+            aria-hidden="true"
+          >
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           {!collapsed && (
-            <div>
-              <h2 className="text-lg font-semibold glow-text">마음 거울</h2>
-              <p className="text-xs text-muted-foreground">당신의 성찰 동반자</p>
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold text-foreground truncate">마음 거울</h1>
+              <p className="text-xs text-muted-foreground truncate">당신의 성찰 동반자</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">메뉴</SidebarGroupLabel>
+      <SidebarContent className="flex flex-col">
+        <SidebarGroup className="px-2 py-3">
+          <SidebarGroupLabel className="px-3 mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            메뉴
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink
                     to="/"
                     end
                     className={({ isActive }) =>
-                      isActive ? "bg-sidebar-accent text-primary font-medium border-l-2 border-primary" : "hover:bg-sidebar-accent"
+                      cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                        isActive 
+                          ? "bg-primary/[0.12] text-primary font-medium" 
+                          : "text-foreground/80 hover:bg-sidebar-accent hover:text-foreground"
+                      )
                     }
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <MessageSquare className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     {!collapsed && <span>대화</span>}
                   </NavLink>
                 </SidebarMenuButton>
@@ -75,10 +86,15 @@ export const AppSidebar = ({
                   <NavLink
                     to="/insights"
                     className={({ isActive }) =>
-                      isActive ? "bg-sidebar-accent text-primary font-medium border-l-2 border-primary" : "hover:bg-sidebar-accent"
+                      cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                        isActive 
+                          ? "bg-primary/[0.12] text-primary font-medium" 
+                          : "text-foreground/80 hover:bg-sidebar-accent hover:text-foreground"
+                      )
                     }
                   >
-                    <Star className="h-4 w-4" />
+                    <Star className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     {!collapsed && <span>나의 통찰</span>}
                   </NavLink>
                 </SidebarMenuButton>
@@ -88,9 +104,11 @@ export const AppSidebar = ({
         </SidebarGroup>
 
         {!collapsed && (
-          <SidebarGroup className="flex-1">
-            <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">대화 기록</SidebarGroupLabel>
-            <SidebarGroupContent className="h-full">
+          <SidebarGroup className="flex-1 min-h-0 px-2 py-2">
+            <SidebarGroupLabel className="px-3 mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              대화 기록
+            </SidebarGroupLabel>
+            <SidebarGroupContent className="h-full overflow-hidden">
               <ConversationList
                 conversations={conversations}
                 activeId={activeConversationId}
@@ -101,20 +119,35 @@ export const AppSidebar = ({
         )}
 
         {!collapsed && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-xs uppercase tracking-wide text-muted-foreground/80">설정</SidebarGroupLabel>
-            <SidebarGroupContent className="p-3 pt-2 space-y-3">
+          <SidebarGroup className="px-2 py-3 border-t border-sidebar-border">
+            <SidebarGroupLabel className="px-3 mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              설정
+            </SidebarGroupLabel>
+            <SidebarGroupContent className="px-3 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">전문가 가이드</p>
-                  <p className="text-xs text-muted-foreground">IRL로 응답 재랭킹</p>
+                <div className="min-w-0 flex-1 mr-3">
+                  <p className="text-sm font-medium text-foreground">전문가 가이드</p>
+                  <p className="text-xs text-muted-foreground truncate">IRL로 응답 재랭킹</p>
                 </div>
-                <Switch checked={irlEnabled} onCheckedChange={setIrlEnabled} />
+                <Switch 
+                  checked={irlEnabled} 
+                  onCheckedChange={setIrlEnabled}
+                  aria-label="전문가 가이드 활성화"
+                />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">정책 버전</label>
-                <Select value={irlPolicyVersion} onValueChange={setIrlPolicyVersion} disabled={!irlEnabled}>
-                  <SelectTrigger className="h-9">
+              <div className="space-y-2">
+                <label 
+                  htmlFor="policy-version-select"
+                  className="text-xs text-muted-foreground block"
+                >
+                  정책 버전
+                </label>
+                <Select 
+                  value={irlPolicyVersion} 
+                  onValueChange={setIrlPolicyVersion} 
+                  disabled={!irlEnabled}
+                >
+                  <SelectTrigger id="policy-version-select" className="h-9">
                     <SelectValue placeholder="선택" />
                   </SelectTrigger>
                   <SelectContent>
@@ -128,11 +161,14 @@ export const AppSidebar = ({
           </SidebarGroup>
         )}
 
-        {/* Sticky footer new chat button */}
         {!collapsed && (
-          <div className="p-3 border-t border-sidebar-border sticky bottom-0 bg-sidebar">
-            <Button onClick={onNewConversation} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="mr-2 h-4 w-4" /> 새 대화 시작
+          <div className="p-3 border-t border-sidebar-border mt-auto">
+            <Button 
+              onClick={onNewConversation} 
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              새 대화 시작
             </Button>
           </div>
         )}

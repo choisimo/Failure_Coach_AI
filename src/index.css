@@ -8,7 +8,45 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* App core palette (dark default) */
+    /* ==========================================
+       8pt Grid Spacing System
+       ========================================== */
+    --spacing-0: 0px;
+    --spacing-1: 4px;    /* 0.25rem - micro spacing */
+    --spacing-2: 8px;    /* 0.5rem - tight spacing */
+    --spacing-3: 12px;   /* 0.75rem - compact spacing */
+    --spacing-4: 16px;   /* 1rem - standard spacing */
+    --spacing-5: 20px;   /* 1.25rem */
+    --spacing-6: 24px;   /* 1.5rem - comfortable spacing */
+    --spacing-8: 32px;   /* 2rem - section spacing */
+    --spacing-10: 40px;  /* 2.5rem */
+    --spacing-12: 48px;  /* 3rem - large section spacing */
+    --spacing-16: 64px;  /* 4rem */
+
+    /* ==========================================
+       Component-specific tokens
+       ========================================== */
+    --icon-bg-opacity: 0.15;
+    --hover-bg-opacity: 0.08;
+    --active-bg-opacity: 0.12;
+    
+    /* Message bubble tokens */
+    --message-max-width: 85%;
+    --message-padding-x: 16px;
+    --message-padding-y: 12px;
+    --message-gap: 12px;
+    
+    /* Card tokens */
+    --card-padding: 16px;
+    --card-gap: 12px;
+    
+    /* Input tokens */
+    --input-height: 44px;
+    --input-padding-x: 16px;
+
+    /* ==========================================
+       App core palette (dark default)
+       ========================================== */
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
