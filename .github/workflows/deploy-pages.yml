@@ -42,7 +42,7 @@ jobs:
       - name: Build project
         run: npm run build
         env:
-          VITE_AI_GATEWAY_URL: ${{ secrets.AI_GATEWAY_URL || 'https://ai-serve.nodove.com' }}
+          VITE_AI_GATEWAY_URL: ${{ secrets.AI_GATEWAY_URL || 'https://ai-failure.nodove.com' }}
           VITE_AI_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_PUBLIC_KEY }}
           VITE_OPENAI_COMPATIBLE_URL: ${{ secrets.OPENAI_COMPATIBLE_URL }}
           VITE_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
