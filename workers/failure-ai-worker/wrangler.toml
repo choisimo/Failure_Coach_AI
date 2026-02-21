@@ -2,6 +2,7 @@ name = "failure_ai_check_gateway"
 main = "./src/index.ts"
 compatibility_date = "2025-10-28"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 # Secrets managed via GitHub Actions (wrangler secret put):
 #   OPENAI_API_URL   — upstream OpenAI-compatible base URL
@@ -10,6 +11,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.production]
 name = "failure_ai_check_gateway"
+workers_dev = true
 
 [env.production.vars]
 ALLOWED_ORIGINS = "http://localhost:8080,http://localhost:4173,https://ai-failure-chat.nodove.com"

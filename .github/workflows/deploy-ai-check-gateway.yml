@@ -23,7 +23,7 @@ jobs:
           node-version: 20
 
       - name: Install Wrangler
-        run: npm install --global wrangler@3
+        run: npm install --global wrangler@4
 
       - name: Push secrets to Cloudflare
         working-directory: workers/failure-ai-worker
