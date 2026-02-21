@@ -14,6 +14,5 @@ name = "failure_ai_check_gateway"
 [env.production.vars]
 ALLOWED_ORIGINS = "http://localhost:8080,http://localhost:4173,https://ai-failure-chat.nodove.com"
 
-[[env.production.routes]]
-pattern = "ai-failure.nodove.com/*"
-zone_name = "nodove.com"
+[[env.production.custom_domains]]
+pattern = "ai-failure.nodove.com"
