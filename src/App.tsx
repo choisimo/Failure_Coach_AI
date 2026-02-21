@@ -11,11 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Wand2, ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GuidedPathIcon, PersonaForgeIcon } from "@/components/icons/AgenticIcons";
 
 const Chat = lazy(() => import("./pages/Chat"));
 const Insights = lazy(() => import("./pages/Insights"));
+const PromptStudio = lazy(() => import("./pages/PromptStudio"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function PageLoader() {
@@ -31,9 +33,16 @@ const queryClient = new QueryClient();
 function AppContent() {
   const {
     conversations,
+    workspaces,
     activeConversationId,
     setActiveConversation,
     addConversation,
+    deleteConversation,
+    createWorkspace,
+    moveConversationsToWorkspace,
+    toggleWorkspaceCollapsed,
+    renameWorkspace,
+    deleteWorkspace,
   } = useChatStore();
 
   const navigate = useNavigate();
@@ -53,6 +62,21 @@ function AppContent() {
   const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
     navigate(`/chat/${id}`);
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    const wasActive = activeConversationId === id;
+    deleteConversation(id);
+
+    if (!wasActive) return;
+
+    const state = useChatStore.getState();
+    const nextId = state.activeConversationId ?? state.conversations[0]?.id ?? null;
+    if (nextId) {
+      navigate(`/chat/${nextId}`);
+      return;
+    }
+    navigate("/");
   };
 
   const startGuided = () => {
@@ -75,12 +99,23 @@ function AppContent() {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar
           conversations={conversations}
+          workspaces={workspaces}
           activeConversationId={activeConversationId || undefined}
           onSelectConversation={handleSelectConversation}
+          onDeleteConversation={handleDeleteConversation}
           onNewConversation={handleNewConversation}
+          onCreateWorkspace={(conversationIds) => {
+            createWorkspace({ conversationIds });
+          }}
+          onMoveToWorkspace={moveConversationsToWorkspace}
+          onToggleWorkspace={toggleWorkspaceCollapsed}
+          onRenameWorkspace={renameWorkspace}
+          onDeleteWorkspace={(workspaceId) => {
+            deleteWorkspace(workspaceId, true);
+          }}
         />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border px-4 bg-background/95 backdrop-blur-sm sticky top-0 z-20">
+          <header className="sticky top-0 z-20 flex h-[4.75rem] items-center border-b border-border bg-background/95 px-4 backdrop-blur-sm">
             <SidebarTrigger aria-label="사이드바 토글" />
           </header>
           <main className="flex-1 flex overflow-hidden">
@@ -89,6 +124,7 @@ function AppContent() {
                 <Route path="/" element={<Chat />} />
                 <Route path="/chat/:conversationId" element={<Chat />} />
                 <Route path="/insights" element={<Insights />} />
+                <Route path="/prompt-studio" element={<PromptStudio />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -116,7 +152,7 @@ function AppContent() {
                 )}
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/[0.12] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <Sparkles className="h-6 w-6 text-primary" />
+                  <GuidedPathIcon className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-1.5">그림자 작업 시작하기</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
@@ -132,7 +168,7 @@ function AppContent() {
                 )}
               >
                 <div className="w-12 h-12 rounded-xl bg-accent/[0.12] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <Wand2 className="h-6 w-6 text-accent" />
+                  <PersonaForgeIcon className="h-6 w-6 text-accent" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-1.5">새 페르소나 만들기</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">

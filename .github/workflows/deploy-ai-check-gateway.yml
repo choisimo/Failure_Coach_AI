@@ -30,30 +30,22 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          SECRET_INTERNAL_KEY: ${{ secrets.AI_GATEWAY_SECRET_INTERNAL_KEY }}
-          SECRET_CALLER_KEY: ${{ secrets.AI_GATEWAY_SECRET_CALLER_KEY }}
-          GITHUB_TOKEN_SECRET: ${{ secrets.AI_GATEWAY_GITHUB_TOKEN }}
+          _OPENAI_API_URL: ${{ secrets.OPENAI_API_URL }}
+          _OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          _OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "Cloudflare credentials are missing" >&2
+            echo "CF_API_TOKEN and CF_ACCOUNT_ID are required" >&2
             exit 1
           fi
-          if [ -z "$SECRET_INTERNAL_KEY" ]; then
-            echo "AI_GATEWAY_SECRET_INTERNAL_KEY is required" >&2
-            exit 1
-          fi
-          if [ -z "$GITHUB_TOKEN_SECRET" ]; then
-            echo "AI_GATEWAY_GITHUB_TOKEN is required" >&2
+          if [ -z "$_OPENAI_API_URL" ] || [ -z "$_OPENAI_API_KEY" ] || [ -z "$_OPENAI_MODEL" ]; then
+            echo "OPENAI_API_URL, OPENAI_API_KEY, and OPENAI_MODEL are required" >&2
             exit 1
           fi
 
-          echo "$SECRET_INTERNAL_KEY" | wrangler secret put SECRET_INTERNAL_KEY --env production --config ./wrangler.toml
-
-          if [ -n "$SECRET_CALLER_KEY" ]; then
-            echo "$SECRET_CALLER_KEY" | wrangler secret put SECRET_CALLER_KEY --env production --config ./wrangler.toml
-          fi
-
-          echo "$GITHUB_TOKEN_SECRET" | wrangler secret put GITHUB_TOKEN --env production --config ./wrangler.toml
+          echo "$_OPENAI_API_URL" | wrangler secret put OPENAI_API_URL --env production --config ./wrangler.toml
+          echo "$_OPENAI_API_KEY" | wrangler secret put OPENAI_API_KEY --env production --config ./wrangler.toml
+          echo "$_OPENAI_MODEL"   | wrangler secret put OPENAI_MODEL   --env production --config ./wrangler.toml
 
       - name: Deploy worker
         working-directory: workers/failure-ai-worker

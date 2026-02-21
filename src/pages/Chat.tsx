@@ -6,11 +6,10 @@ import { ChatInput } from "@/components/ChatInput";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatStore } from "@/hooks/useChatStore";
 import { useToast } from "@/hooks/use-toast";
-import { requestGatewayCompletion, getSessionMessages, extractIRLMetadata, sendFeedbackReliable } from "@/lib/aiGateway";
-import { cn, computeHistoryHash } from "@/lib/utils";
+import { requestGatewayCompletion } from "@/lib/aiGateway";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSettingsStore } from "@/hooks/useSettingsStore";
 import { ContentLayout } from "@/components/ContentLayout";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -39,8 +38,6 @@ export default function Chat() {
   const activeConversation = useChatStore((s) =>
     s.activeConversationId ? s.conversations.find((c) => c.id === s.activeConversationId) : undefined
   );
-
-  const { irlEnabled, irlPolicyVersion } = useSettingsStore();
 
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -104,35 +101,6 @@ export default function Chat() {
     if (activeConversation?.mode === "CUSTOM") setShowWelcome(false);
   }, [activeConversation?.mode]);
 
-  const conversationPersonaTitle = activeConversation?.personaTitle;
-  const conversationCustomPrompt = activeConversation?.customPrompt;
-
-  useEffect(() => {
-    const sessionId = activeConversation?.sessionId;
-    if (!sessionId || !activeConversation?.id) return;
-
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const list = await getSessionMessages(sessionId, controller.signal);
-        const first = Array.isArray(list) ? list[0] : undefined;
-        const metadata = (first && typeof first === "object" ? (first as Record<string, unknown>).metadata : undefined) as Record<string, unknown> | undefined ?? {};
-        const isSeed = Boolean((first as Record<string, unknown>)?.noReply) || metadata?.source === "custom-mode-seed";
-        if (isSeed) {
-          const patch: Partial<{ mode: "CUSTOM"; personaTitle: string; customPrompt: string }> = { mode: "CUSTOM" as const };
-          if (metadata?.personaTitle && !conversationPersonaTitle) patch.personaTitle = String(metadata.personaTitle);
-          if (metadata?.customSystemPrompt && !conversationCustomPrompt) patch.customPrompt = String(metadata.customSystemPrompt);
-          useChatStore.getState().updateConversation(activeConversation.id, patch);
-          setShowWelcome(false);
-        }
-      } catch {
-        // silent fail on rehydrate
-      }
-    })();
-
-    return () => controller.abort();
-  }, [activeConversation?.sessionId, activeConversation?.id, conversationPersonaTitle, conversationCustomPrompt]);
-
   const handleSend = async (content: string) => {
     if (!activeConversationId) return;
 
@@ -146,45 +114,16 @@ export default function Chat() {
     ];
 
     try {
-      const historyHash = await computeHistoryHash(history);
-      const candidates = 3;
-      const { reply, raw } = await requestGatewayCompletion({
+      const { reply } = await requestGatewayCompletion({
         messages: history,
         metadata: {
-          conversationId: activeConversationId,
           sessionMode: activeConversation?.mode,
           customSystemPrompt: activeConversation?.customPrompt,
           personaTitle: activeConversation?.personaTitle,
-          sessionId: activeConversation?.sessionId,
-          irlEnabled,
-          irlPolicyVersion,
-          policyVersion: irlPolicyVersion,
-          candidates,
-          historyHash,
         },
       });
 
-      const createdId = (raw as Record<string, unknown>)?.sessionId || ((raw as Record<string, unknown>)?.sessionCreate as Record<string, unknown>)?.id;
-      if (createdId) {
-        useChatStore.getState().setConversationSession(activeConversationId, String(createdId));
-      }
-
-      const parsed = extractIRLMetadata(raw);
-      if (!parsed || (Object.values(parsed).every((v) => v == null))) {
-        console.warn("Missing IRL metadata", raw);
-      }
-      addMessage(activeConversationId, {
-        role: "assistant",
-        content: reply,
-        policyId: parsed.policyId,
-        irlScore: parsed.irlScore,
-        safetyScore: parsed.safetyScore,
-        rank: parsed.rank,
-        reason: parsed.reason,
-        traceId: parsed.traceId,
-        candidateId: parsed.candidateId,
-        candidateSet: Array.isArray(parsed.candidateSet) ? parsed.candidateSet : [],
-      });
+      addMessage(activeConversationId, { role: "assistant", content: reply });
     } catch (error) {
       console.error(error);
       toast({
@@ -220,41 +159,11 @@ export default function Chat() {
     }
   };
 
-  const handleLikeToggle = async (messageId: string) => {
+  const handleLikeToggle = (messageId: string) => {
     if (!activeConversationId) return;
     const msg = messages.find((m) => m.id === messageId);
     if (!msg) return;
-    const next = !msg.liked;
-    useChatStore.getState().updateMessage(activeConversationId, messageId, { liked: next });
-
-    try {
-      const conv = activeConversation;
-      const traceId = msg.traceId;
-      const candidateId = msg.candidateId;
-      const policyId = msg.policyId;
-      const scores = {
-        irl: msg.irlScore,
-        safety: msg.safetyScore,
-        rank: msg.rank,
-      } as Record<string, unknown>;
-      await sendFeedbackReliable({
-        conversationId: activeConversationId,
-        sessionId: conv?.sessionId,
-        messageId,
-        candidateId,
-        action: next ? "like" : "unlike",
-        traceId,
-        policyId,
-        scores,
-      }, {
-        onFinalFailure: () => {
-          console.warn("IRL feedback permanently failed for message", { messageId, traceId, candidateId });
-          toast({ title: "피드백 전송 실패", description: "재시도에도 전송되지 않았습니다. 좋아요 상태는 유지됩니다.", variant: "destructive" });
-        }
-      });
-    } catch (err) {
-      console.warn("IRL feedback error", err);
-    }
+    useChatStore.getState().updateMessage(activeConversationId, messageId, { liked: !msg.liked });
   };
 
   const handleRegenerate = async (assistantMessageId: string) => {
@@ -263,14 +172,8 @@ export default function Chat() {
     const idx = list.findIndex((m) => m.id === assistantMessageId);
     if (idx === -1) return;
 
-    let lastUserIndex = -1;
-    for (let i = idx - 1; i >= 0; i--) {
-      if (list[i].role === "user") {
-        lastUserIndex = i;
-        break;
-      }
-    }
-    if (lastUserIndex === -1) return;
+    const hasUserBefore = list.slice(0, idx).some((m) => m.role === "user");
+    if (!hasUserBefore) return;
 
     setIsTyping(true);
 
@@ -280,21 +183,12 @@ export default function Chat() {
     }>;
 
     try {
-      const historyHash = await computeHistoryHash(history);
-      const candidates = 3;
       const { reply } = await requestGatewayCompletion({
         messages: history,
         metadata: {
-          conversationId: activeConversationId,
           sessionMode: activeConversation?.mode,
           customSystemPrompt: activeConversation?.customPrompt,
           personaTitle: activeConversation?.personaTitle,
-          sessionId: activeConversation?.sessionId,
-          irlEnabled,
-          irlPolicyVersion,
-          policyVersion: irlPolicyVersion,
-          candidates,
-          historyHash,
         },
       });
 
@@ -351,19 +245,6 @@ export default function Chat() {
                   <p className="text-xs whitespace-pre-wrap leading-relaxed">
                     {activeConversation?.customPrompt || "사용자 정의 프롬프트가 제공되지 않았습니다."}
                   </p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {irlEnabled && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="outline" className="font-medium text-primary border-primary/30">
-                    전문가 가이드
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="max-w-xs">
-                  <p className="text-xs">IRL 정책으로 응답을 재랭킹합니다.</p>
-                  <p className="text-xs text-muted-foreground mt-1">정책 버전: {irlPolicyVersion}</p>
                 </TooltipContent>
               </Tooltip>
             )}

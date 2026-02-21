@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Copy, Heart, RefreshCw, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+const MarkdownRenderer = lazy(() => import("@/components/MarkdownRenderer"));
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -68,7 +68,9 @@ export const ChatMessage = ({ message, highlighted, onSave, onCopy, onLikeToggle
           {isUser ? (
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <MarkdownRenderer content={message.content} />
+            <Suspense fallback={<p className="text-sm leading-relaxed text-muted-foreground animate-pulse">{message.content}</p>}>
+              <MarkdownRenderer content={message.content} />
+            </Suspense>
           )}
         </div>
 

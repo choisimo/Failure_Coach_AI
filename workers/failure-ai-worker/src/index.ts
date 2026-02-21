@@ -1,112 +1,155 @@
+/**
+ * Failure Coach AI — OpenAI-Compatible Gateway Worker
+ *
+ * Responsibilities:
+ *  1. CORS enforcement (origin whitelist)
+ *  2. Inject upstream API key and base URL from secrets (never exposed to browser)
+ *  3. Forward /v1/chat/completions (and all /v1/* paths) to the upstream provider
+ *  4. Stream passthrough support (SSE)
+ *
+ * Environment variables (wrangler.toml [vars]):
+ *  ALLOWED_ORIGINS  — comma-separated list of allowed browser origins
+ *
+ * Secrets (wrangler secret put):
+ *  OPENAI_API_URL   — upstream base URL (e.g. https://api.openai.com)
+ *  OPENAI_API_KEY   — upstream API key
+ *  OPENAI_MODEL     — default model name (e.g. gpt-4o); used when no model in body
+ */
+
 type Env = {
-  AI_GATEWAY_ALLOWED_ORIGINS?: string;
-  AI_GATEWAY_BACKEND_HOST: string;
-  SECRET_INTERNAL_KEY: string;
-  SECRET_CALLER_KEY?: string;
-  GITHUB_TOKEN?: string;
+  /** Comma-separated allowed browser origins, e.g. "https://ai-failure-chat.nodove.com,http://localhost:8080" */
+  ALLOWED_ORIGINS?: string;
+  /** Upstream OpenAI-compatible base URL — managed as a secret */
+  OPENAI_API_URL: string;
+  /** Upstream API key — managed as a secret */
+  OPENAI_API_KEY: string;
+  /** Default model name — managed as a secret */
+  OPENAI_MODEL: string;
 };
 
-function json(data: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(data), {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    status: init?.status ?? 200,
-  });
-}
+const CORS_MAX_AGE = "600";
 
-function applyCors(headers: Headers, origin: string, requestHeaders?: string | null) {
-  headers.set("Access-Control-Allow-Origin", origin);
-  headers.set("Vary", "Origin, Access-Control-Request-Headers, Access-Control-Request-Method");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  const incoming = (requestHeaders || "")
+function parseOrigins(raw: string | undefined): string[] {
+  return (raw ?? "")
     .split(",")
-    .map((value) => value.trim())
+    .map((o) => o.trim())
     .filter(Boolean);
-  const base = ["Content-Type", "X-API-KEY"];
-  const merged = Array.from(new Set([...base, ...incoming])).join(", ");
-  headers.set("Access-Control-Allow-Headers", merged);
-  headers.set("Access-Control-Max-Age", "600");
 }
 
-async function streamBody(request: Request) {
-  if (["GET", "HEAD"].includes(request.method)) {
-    return undefined;
-  }
+function isOriginAllowed(origin: string, allowed: string[]): boolean {
+  return allowed.includes("*") || allowed.includes(origin);
+}
 
-  // Cloudflare Workers supports request.arrayBuffer or request.text.
-  // Using arrayBuffer to support binary payloads if needed.
-  const buf = await request.arrayBuffer();
-  return buf;
+function applyCors(headers: Headers, origin: string, requestedHeaders?: string | null): void {
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Vary", "Origin");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Max-Age", CORS_MAX_AGE);
+
+  const base = ["Content-Type", "Authorization"];
+  const extra = (requestedHeaders ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean);
+  headers.set("Access-Control-Allow-Headers", [...new Set([...base, ...extra])].join(", "));
+}
+
+function jsonResponse(data: unknown, status = 200, corsOrigin?: string): Response {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (corsOrigin) applyCors(headers, corsOrigin);
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const origin = request.headers.get("Origin") || "";
-    const callerKey = request.headers.get("X-Gateway-Caller-Key") || "";
-    const allowed = (env.AI_GATEWAY_ALLOWED_ORIGINS || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const isBrowserAllowed = !!origin && (allowed.includes("*") || allowed.includes(origin));
-    const isWorkerAllowed = !origin && !!env.SECRET_CALLER_KEY && callerKey === env.SECRET_CALLER_KEY;
+    const origin = request.headers.get("Origin") ?? "";
+    const allowed = parseOrigins(env.ALLOWED_ORIGINS);
+    const originAllowed = !!origin && isOriginAllowed(origin, allowed);
 
+    // ── CORS preflight ──────────────────────────────────────────────────────
     if (request.method === "OPTIONS") {
-      if (!isBrowserAllowed) {
-        return json({ error: "Forbidden: Invalid origin" }, { status: 403 });
+      if (!originAllowed) {
+        return jsonResponse({ error: "Forbidden: origin not allowed" }, 403);
       }
       const res = new Response(null, { status: 204 });
       applyCors(res.headers, origin, request.headers.get("Access-Control-Request-Headers"));
       return res;
     }
 
-    if (!(isBrowserAllowed || isWorkerAllowed)) {
-      return json({ error: "Forbidden: Invalid origin" }, { status: 403 });
+    // ── Origin check for non-preflight ─────────────────────────────────────
+    if (!originAllowed) {
+      return jsonResponse({ error: "Forbidden: origin not allowed" }, 403);
     }
 
-    if (!env.SECRET_INTERNAL_KEY || !env.GITHUB_TOKEN) {
-      const res = json({ error: "Server misconfiguration: missing required secrets" }, { status: 500 });
-      if (isBrowserAllowed && origin) {
-        applyCors(res.headers, origin, request.headers.get("Access-Control-Request-Headers"));
+    // ── Secret validation ───────────────────────────────────────────────────
+    if (!env.OPENAI_API_URL || !env.OPENAI_API_KEY) {
+      return jsonResponse(
+        { error: "Worker misconfiguration: OPENAI_API_URL or OPENAI_API_KEY not set" },
+        500,
+        origin
+      );
+    }
+
+    // ── Build upstream URL ──────────────────────────────────────────────────
+    // Strip the worker's own hostname; keep path + search
+    const incomingUrl = new URL(request.url);
+    const baseUrl = env.OPENAI_API_URL.replace(/\/$/, "");
+    const upstreamUrl = `${baseUrl}${incomingUrl.pathname}${incomingUrl.search}`;
+
+    // ── Inject model default if not present in body ─────────────────────────
+    let upstreamBody: BodyInit | undefined;
+    if (
+      request.method === "POST" &&
+      request.headers.get("Content-Type")?.includes("application/json") &&
+      env.OPENAI_MODEL
+    ) {
+      try {
+        const body = await request.json() as Record<string, unknown>;
+        if (!body.model) {
+          body.model = env.OPENAI_MODEL;
+        }
+        upstreamBody = JSON.stringify(body);
+      } catch {
+        // If JSON parsing fails, forward the raw body as-is
+        upstreamBody = request.body ?? undefined;
       }
-      return res;
+    } else {
+      upstreamBody = request.method === "GET" ? undefined : (request.body ?? undefined);
     }
 
-    const url = new URL(request.url);
-    url.hostname = env.AI_GATEWAY_BACKEND_HOST;
-    url.protocol = "https:";
+    // ── Forward request ─────────────────────────────────────────────────────
+    const upstreamHeaders = new Headers(request.headers);
+    upstreamHeaders.set("Authorization", `Bearer ${env.OPENAI_API_KEY}`);
+    upstreamHeaders.delete("Origin");
+    upstreamHeaders.delete("Host");
+    upstreamHeaders.delete("CF-Connecting-IP");
+    upstreamHeaders.delete("CF-Ray");
+    upstreamHeaders.delete("CF-IPCountry");
+    upstreamHeaders.delete("CF-Visitor");
 
-    const reqHeaders = new Headers(request.headers);
-    reqHeaders.set("Host", env.AI_GATEWAY_BACKEND_HOST);
-
-    reqHeaders.delete("X-API-KEY");
-    reqHeaders.delete("X-Gateway-Caller-Key");
-    reqHeaders.delete("X-Internal-Gateway-Key");
-    reqHeaders.delete("Authorization");
-
-    reqHeaders.set("X-Internal-Gateway-Key", env.SECRET_INTERNAL_KEY);
-    reqHeaders.set("Authorization", `Bearer ${env.GITHUB_TOKEN}`);
-    reqHeaders.set("X-Forwarded-Authorization", `Bearer ${env.GITHUB_TOKEN}`);
-
-    const forwarded = new Request(url.toString(), {
+    const upstreamRequest = new Request(upstreamUrl, {
       method: request.method,
-      headers: reqHeaders,
-      body: await streamBody(request),
-      redirect: "manual",
+      headers: upstreamHeaders,
+      body: upstreamBody,
+      redirect: "follow",
     });
 
     try {
-      const backendRes = await fetch(forwarded);
-      const headers = new Headers(backendRes.headers);
-      if (isBrowserAllowed && origin) {
-        applyCors(headers, origin);
-      }
-      return new Response(backendRes.body, { status: backendRes.status, headers });
+      const upstreamRes = await fetch(upstreamRequest);
+
+      // Passthrough response (including streaming SSE)
+      const resHeaders = new Headers(upstreamRes.headers);
+      resHeaders.delete("Access-Control-Allow-Origin");
+      applyCors(resHeaders, origin);
+
+      return new Response(upstreamRes.body, {
+        status: upstreamRes.status,
+        statusText: upstreamRes.statusText,
+        headers: resHeaders,
+      });
     } catch (err) {
-      console.error("ai-check-gateway: upstream fetch failed", err);
-      const res = json({ error: "Upstream fetch failed" }, { status: 502 });
-      if (isBrowserAllowed && origin) {
-        applyCors(res.headers, origin, request.headers.get("Access-Control-Request-Headers"));
-      }
-      return res;
+      console.error("[gateway] upstream fetch failed", err);
+      return jsonResponse({ error: "Upstream fetch failed" }, 502, origin);
     }
   },
 };

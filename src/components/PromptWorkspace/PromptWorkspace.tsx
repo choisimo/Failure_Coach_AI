@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { ChangeEvent, useMemo, useState } from "react";
 import {
   PROMPT_CATEGORY_OPTIONS,
   PromptBlock,
@@ -15,20 +15,36 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, PlusCircle, Trash2, Pencil, Save, Layers } from "lucide-react";
+import { Upload, FileText, PlusCircle, Trash2, Pencil, Save, Layers, ArrowDown, ArrowUp, Search, CopyPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
+import { useChatStore } from "@/hooks/useChatStore";
+import { useNavigate } from "react-router-dom";
+import { FlowBranchIcon, PromptCircuitIcon } from "@/components/icons/AgenticIcons";
 
 interface PromptWorkspaceProps {
   onClose?: () => void;
 }
 
 const MAX_CONTENT_PREVIEW_LENGTH = 240;
+const BLOCK_SORT_OPTIONS = [
+  { value: "recent", label: "최근 수정 순" },
+  { value: "created", label: "생성 순" },
+  { value: "name", label: "이름순" },
+] as const;
+
+type BlockSortMode = (typeof BLOCK_SORT_OPTIONS)[number]["value"];
+
+const PROMPT_CATEGORY_SET = new Set<PromptCategory>(
+  PROMPT_CATEGORY_OPTIONS.map((option) => option.value)
+);
+
+const isPromptCategory = (value: unknown): value is PromptCategory =>
+  typeof value === "string" && PROMPT_CATEGORY_SET.has(value as PromptCategory);
 
 const ContentPreview = ({ content }: { content: string }) => {
   const trimmed = content.trim();
@@ -48,16 +64,23 @@ const BlockCard = ({
   isActive,
   onSelect,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   block: PromptBlock;
   isActive?: boolean;
   onSelect?: () => void;
   onEdit?: () => void;
+  onDuplicate?: () => void;
   onDelete?: () => void;
 }) => {
   return (
-    <Card className={cn("border-border/60 hover:border-primary/60 transition-colors", isActive && "border-primary")}> 
+    <Card
+      className={cn(
+        "border-border/60 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-sm",
+        isActive && "border-primary/70 shadow-sm"
+      )}
+    >
       <CardHeader className="space-y-1">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
@@ -89,6 +112,9 @@ const BlockCard = ({
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={onEdit}>
               <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onDuplicate}>
+              <CopyPlus className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={onDelete}>
               <Trash2 className="h-4 w-4" />
@@ -209,11 +235,13 @@ const PromptComposer = ({
   blocks,
   onChange,
   onGenerate,
+  onApplyToChat,
 }: {
   sections: PromptComposerSection[];
   blocks: PromptBlock[];
   onChange: (sections: PromptComposerSection[]) => void;
   onGenerate: () => void;
+  onApplyToChat: () => void;
 }) => {
   const { activePerCategory, setActiveForCategory } = usePromptStore();
 
@@ -228,6 +256,24 @@ const PromptComposer = ({
     );
     onChange(updated);
     setActiveForCategory(category, blockId);
+  };
+
+  const handleMoveSection = (sectionId: string, direction: "up" | "down") => {
+    const currentIndex = sections.findIndex((section) => section.id === sectionId);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= sections.length) return;
+
+    const reordered = [...sections];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    onChange(reordered);
+  };
+
+  const handleRemoveSection = (sectionId: string) => {
+    if (sections.length <= 1) return;
+    onChange(sections.filter((section) => section.id !== sectionId));
   };
 
   const compositePrompt = useMemo(() => {
@@ -245,28 +291,43 @@ const PromptComposer = ({
   }, [sections, blocks]);
 
   return (
-    <Card className="border-primary/50">
+    <Card className="border-primary/40 bg-card/95">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>프롬프트 조합</CardTitle>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <PromptCircuitIcon className="h-5 w-5 text-primary" />
+              프롬프트 조합
+            </CardTitle>
             <CardDescription>선택한 블록들을 순서대로 합쳐 하나의 프롬프트로 미리보기 합니다.</CardDescription>
           </div>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Layers className="h-3.5 w-3.5" /> {sections.filter((section) => section.blockId).length}개 선택됨
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="flex items-center gap-1 self-start shrink-0 whitespace-nowrap">
+              <Layers className="h-3.5 w-3.5" /> {sections.filter((section) => section.blockId).length}개 선택됨
+            </Badge>
+            <Button size="sm" variant="outline" onClick={onGenerate}>
+              복사하기
+            </Button>
+            <Button size="sm" className="gap-2" onClick={onApplyToChat}>
+              <PromptCircuitIcon className="h-4 w-4" />
+              이 설정으로 대화 시작
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="grid md:grid-cols-[320px_1fr] gap-6">
+      <CardContent className="grid gap-6 lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)]">
         <div className="space-y-4">
-          {sections.map((section) => {
+          {sections.map((section, index) => {
             const block = blocks.find((b) => b.id === section.blockId);
             const categoryOption = PROMPT_CATEGORY_OPTIONS.find((option) => option.value === section.category);
+            const isBaseSection = section.id.startsWith("composer-");
+
             return (
-              <div key={section.id} className="p-3 rounded-lg border border-border/60 space-y-3">
-                <div className="flex items-center justify-between">
+              <div key={section.id} className="space-y-3 rounded-lg border border-border/60 p-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold flex items-center gap-2">
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      <FlowBranchIcon className="h-3.5 w-3.5 text-primary/80" />
                       {categoryOption?.label}
                       {categoryOption?.helper && (
                         <Popover>
@@ -275,28 +336,61 @@ const PromptComposer = ({
                               i
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="text-sm max-w-xs">
-                            {categoryOption.helper}
-                          </PopoverContent>
+                          <PopoverContent className="max-w-xs text-sm">{categoryOption.helper}</PopoverContent>
                         </Popover>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {block ? block.name : "선택 없음"}
-                    </p>
+                    <p className="text-[11px] text-muted-foreground">순서 {index + 1}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{block ? block.name : "선택 없음"}</p>
                   </div>
-                  <Switch
-                    checked={Boolean(section.blockId)}
-                    onCheckedChange={(checked) =>
-                      handleSelectBlock(section.id, checked ? activePerCategory?.[section.category] ?? null : null, section.category)
-                    }
-                  />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleMoveSection(section.id, "up")}
+                      disabled={index === 0}
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleMoveSection(section.id, "down")}
+                      disabled={index === sections.length - 1}
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </Button>
+                    {!isBaseSection && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveSection(section.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Switch
+                      checked={Boolean(section.blockId)}
+                      onCheckedChange={(checked) =>
+                        handleSelectBlock(
+                          section.id,
+                          checked ? activePerCategory?.[section.category] ?? null : null,
+                          section.category
+                        )
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label>대체 블록 선택</Label>
                   <Select
                     value={section.blockId ?? "none"}
-                    onValueChange={(value) => handleSelectBlock(section.id, value === "none" ? null : value, section.category)}
+                    onValueChange={(value) =>
+                      handleSelectBlock(section.id, value === "none" ? null : value, section.category)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="블록을 선택하세요" />
@@ -304,15 +398,10 @@ const PromptComposer = ({
                     <SelectContent>
                       <SelectItem value="none">선택 안함</SelectItem>
                       {blocks
-                        .filter((block) => block.category === section.category)
-                        .map((block) => (
-                          <SelectItem key={block.id} value={block.id}>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{block.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                <ContentPreview content={block.content} />
-                              </span>
-                            </div>
+                        .filter((entry) => entry.category === section.category)
+                        .map((entry) => (
+                          <SelectItem key={entry.id} value={entry.id}>
+                            {entry.name}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -325,7 +414,7 @@ const PromptComposer = ({
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="secondary" className="w-full">
-                <PlusCircle className="h-4 w-4 mr-2" /> 추가 섹션 만들기
+                <PlusCircle className="mr-2 h-4 w-4" /> 추가 섹션 만들기
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -334,43 +423,44 @@ const PromptComposer = ({
               </DialogHeader>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  커스텀 블록을 추가하여 특정 상황에 맞는 지침을 조합할 수 있습니다.
+                  커스텀 블록을 추가해 특정 상황에 맞는 지침을 더 유연하게 조합할 수 있습니다.
                 </p>
-                <Command>
-                  <CommandGroup heading="카테고리 선택">
-                    {PROMPT_CATEGORY_OPTIONS.map((option) => (
-                      <CommandItem
-                        key={option.value}
-                        onSelect={() => {
-                          onChange([
-                            ...sections,
-                            {
-                              id: `${option.value}-${Date.now()}`,
-                              category: option.value,
-                              blockId: null,
-                              weight: 1,
-                            },
-                          ]);
-                        }}
-                      >
-                        {option.label}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </Command>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {PROMPT_CATEGORY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className="rounded-lg border border-border/70 bg-card px-3 py-2 text-left transition-all duration-200 hover:border-primary/50 hover:bg-primary/[0.08]"
+                      onClick={() => {
+                        onChange([
+                          ...sections,
+                          {
+                            id: `${option.value}-${Date.now()}`,
+                            category: option.value,
+                            blockId: null,
+                            weight: 1,
+                          },
+                        ]);
+                      }}
+                    >
+                      <p className="text-sm font-medium text-foreground">{option.label}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{option.helper}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
         </div>
-        <div className="p-4 rounded-lg border border-border/60 bg-card">
-          <div className="flex items-center justify-between mb-2">
+        <div className="min-w-0 rounded-lg border border-border/60 bg-card p-4">
+          <div className="mb-2 flex items-center justify-between">
             <h4 className="font-semibold">전체 프롬프트 미리보기</h4>
-            <Button size="sm" variant="outline" onClick={onGenerate}>
-              복사하기
-            </Button>
+            <Badge variant="secondary" className="text-[10px]">
+              LIVE
+            </Badge>
           </div>
           <ScrollArea className="max-h-[480px]">
-            <pre className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+            <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
               {compositePrompt}
             </pre>
           </ScrollArea>
@@ -382,6 +472,8 @@ const PromptComposer = ({
 
 export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
   const { toast } = useToast();
+  const { addConversation, setActiveConversation } = useChatStore();
+  const navigate = useNavigate();
   const {
     blocks,
     addBlock,
@@ -394,6 +486,8 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     setScratchpad,
   } = usePromptStore();
   const [activeTab, setActiveTab] = useState<PromptCategory | "composer">("composer");
+  const [blockSearchQuery, setBlockSearchQuery] = useState("");
+  const [blockSortMode, setBlockSortMode] = useState<BlockSortMode>("recent");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
 
@@ -414,6 +508,24 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     toast({
       title: "삭제됨",
       description: "선택한 프롬프트가 삭제되었습니다.",
+    });
+  };
+
+  const handleDuplicateBlock = (id: string) => {
+    const source = blocks.find((block) => block.id === id);
+    if (!source) return;
+
+    addBlock({
+      name: `${source.name} (사본)`,
+      category: source.category,
+      description: source.description,
+      content: source.content,
+      tags: source.tags,
+      source: "manual",
+    });
+    toast({
+      title: "복제 완료",
+      description: "프롬프트 블록 사본이 생성되었습니다.",
     });
   };
 
@@ -449,12 +561,34 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
   const handleExport = () => {
     const { prompt, sections } = composePrompt();
 
+    const selectedBlocks = Array.from(
+      new Map(
+        sections
+          .map((section) =>
+            section.blockId ? blocks.find((block) => block.id === section.blockId) ?? null : null
+          )
+          .filter((block): block is PromptBlock => Boolean(block))
+          .map((block) => [block.id, block])
+      ).values()
+    );
+
     const exportData = {
       generatedAt: new Date().toISOString(),
+      blocks: selectedBlocks.map((block) => ({
+        id: block.id,
+        name: block.name,
+        category: block.category,
+        description: block.description,
+        content: block.content,
+        tags: block.tags,
+        source: block.source,
+        fileName: block.fileName,
+      })),
       sections: sections.map((section) => ({
         category: section.category,
         blockId: section.blockId,
       })),
+      scratchpad,
       prompt,
     };
 
@@ -475,7 +609,7 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     });
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -493,35 +627,92 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     try {
       if (file.name.endsWith(".json")) {
         const data = JSON.parse(text) as {
-          blocks?: { name: string; content: string; category?: PromptCategory }[];
-          sections?: { category: PromptCategory; blockId: string | null }[];
+          blocks?: {
+            id?: string;
+            name?: string;
+            content?: string;
+            category?: PromptCategory | string;
+            description?: string;
+            tags?: string[];
+            source?: "manual" | "file";
+            fileName?: string;
+          }[];
+          sections?: { category?: PromptCategory | string; blockId?: string | null }[];
+          scratchpad?: string;
           prompt?: string;
         };
 
-        if (data.blocks?.length) {
-          data.blocks.forEach((block) =>
-            addBlock({
-              ...block,
-              category: block.category ?? "custom",
+        const blockIdMap = new Map<string, string>();
+        let importedBlockCount = 0;
+
+        if (Array.isArray(data.blocks) && data.blocks.length > 0) {
+          data.blocks.forEach((block) => {
+            if (typeof block.name !== "string" || typeof block.content !== "string") return;
+
+            const name = block.name.trim();
+            const content = block.content.trim();
+            if (!name || !content) return;
+
+            const nextId = addBlock({
+              name,
+              category: isPromptCategory(block.category) ? block.category : "custom",
+              description: typeof block.description === "string" ? block.description : undefined,
+              content,
+              tags: Array.isArray(block.tags)
+                ? block.tags.filter((tag): tag is string => typeof tag === "string")
+                : [],
               source: "file",
-              fileName: file.name,
-            })
-          );
+              fileName:
+                typeof block.fileName === "string" && block.fileName.trim().length > 0
+                  ? block.fileName
+                  : file.name,
+            });
+
+            importedBlockCount += 1;
+            if (typeof block.id === "string" && block.id.trim().length > 0) {
+              blockIdMap.set(block.id, nextId);
+            }
+          });
         }
 
-        if (data.sections) {
-          const importedSections = data.sections.map((section, index) => ({
-            id: `${section.category}-${Date.now()}-${index}`,
-            category: section.category,
-            blockId: section.blockId,
-            weight: 1,
-          }));
-          setComposerSections(importedSections);
+        if (Array.isArray(data.sections) && data.sections.length > 0) {
+          const storeState = usePromptStore.getState();
+          const importedSections = data.sections
+            .map((section, index) => {
+              if (!isPromptCategory(section.category)) return null;
+
+              const sourceBlockId = typeof section.blockId === "string" ? section.blockId : null;
+              const resolvedBlockId = sourceBlockId
+                ? blockIdMap.get(sourceBlockId) ?? sourceBlockId
+                : null;
+              const hasResolvedBlock =
+                resolvedBlockId != null &&
+                storeState.blocks.some((block) => block.id === resolvedBlockId);
+
+              return {
+                id: `${section.category}-${Date.now()}-${index}`,
+                category: section.category,
+                blockId: hasResolvedBlock ? resolvedBlockId : null,
+                weight: 1,
+              };
+            })
+            .filter((section): section is PromptComposerSection => Boolean(section));
+
+          if (importedSections.length > 0) {
+            setComposerSections(importedSections);
+          }
+        }
+
+        if (typeof data.scratchpad === "string") {
+          setScratchpad(data.scratchpad);
         }
 
         toast({
           title: "가져오기 완료",
-          description: "JSON 파일에서 프롬프트 구성이 불러와졌습니다.",
+          description:
+            importedBlockCount > 0
+              ? `JSON 파일에서 프롬프트 구성이 불러와졌습니다. (${importedBlockCount}개 블록 추가)`
+              : "JSON 파일에서 프롬프트 구성이 불러와졌습니다.",
         });
       } else {
         const importedBlocks = text
@@ -611,7 +802,38 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     void copyToClipboard();
   };
 
+  const handleApplyToChat = () => {
+    const { prompt } = composePrompt();
+    if (!prompt.trim()) {
+      toast({
+        title: "적용할 프롬프트가 없습니다",
+        description: "조합된 내용을 먼저 구성해 주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const label = new Date().toLocaleDateString("ko-KR", {
+      month: "numeric",
+      day: "numeric",
+    });
+
+    const conversationId = addConversation({
+      mode: "CUSTOM",
+      customPrompt: prompt,
+      personaTitle: `프롬프트 조합 (${label})`,
+    });
+    setActiveConversation(conversationId);
+    navigate(`/chat/${conversationId}`);
+    toast({
+      title: "대화 세션 생성 완료",
+      description: "프롬프트 조합이 시스템 프롬프트로 적용되었습니다.",
+    });
+    onClose?.();
+  };
+
   const filteredBlocks = useMemo(() => {
+    const normalizedQuery = blockSearchQuery.trim().toLowerCase();
     const grouped: Record<PromptCategory, PromptBlock[]> = {
       persona: [],
       strategy: [],
@@ -620,22 +842,47 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
     };
 
     blocks.forEach((block) => {
+      if (normalizedQuery) {
+        const searchable = [block.name, block.description ?? "", block.tags.join(" "), block.content]
+          .join(" ")
+          .toLowerCase();
+        if (!searchable.includes(normalizedQuery)) return;
+      }
       grouped[block.category].push(block);
     });
 
+    const compareByMode = (a: PromptBlock, b: PromptBlock) => {
+      if (blockSortMode === "name") {
+        return a.name.localeCompare(b.name, "ko");
+      }
+      if (blockSortMode === "created") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    };
+
+    (Object.keys(grouped) as PromptCategory[]).forEach((category) => {
+      grouped[category] = [...grouped[category]].sort(compareByMode);
+    });
+
     return grouped;
-  }, [blocks]);
+  }, [blocks, blockSearchQuery, blockSortMode]);
+
+  const visibleBlockCount = useMemo(
+    () => Object.values(filteredBlocks).reduce((total, entries) => total + entries.length, 0),
+    [filteredBlocks]
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold">프롬프트 워크스페이스</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             페르소나, 전략, 후속 액션 등 블록을 조합해 상황별로 맞춤 프롬프트를 구성하세요.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input id="prompt-import" type="file" accept=".json,.txt" className="hidden" onChange={handleImport} />
           <Button variant="outline" onClick={() => document.getElementById("prompt-import")?.click()}>
             <Upload className="h-4 w-4 mr-2" /> 가져오기
@@ -654,11 +901,53 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
         </div>
       </div>
 
+      <Card className="border-border/60 bg-card/70">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={blockSearchQuery}
+                onChange={(event) => setBlockSearchQuery(event.target.value)}
+                placeholder="블록 이름, 태그, 본문으로 검색"
+                className="pl-9"
+              />
+            </div>
+            <Select value={blockSortMode} onValueChange={(value) => setBlockSortMode(value as BlockSortMode)}>
+              <SelectTrigger className="w-full lg:w-[180px]">
+                <SelectValue placeholder="정렬 기준" />
+              </SelectTrigger>
+              <SelectContent>
+                {BLOCK_SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>현재 표시 중인 블록 {visibleBlockCount}개</span>
+            {blockSearchQuery && (
+              <button
+                type="button"
+                className="font-medium text-primary/90 hover:text-primary"
+                onClick={() => setBlockSearchQuery("")}
+              >
+                검색 초기화
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PromptCategory | "composer") }>
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="composer">프롬프트 조합</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto pr-1 thin-scrollbar">
+          <TabsTrigger value="composer" className="px-2 text-xs sm:px-3 sm:text-sm">
+            프롬프트 조합
+          </TabsTrigger>
           {PROMPT_CATEGORY_OPTIONS.map((option) => (
-            <TabsTrigger key={option.value} value={option.value}>
+            <TabsTrigger key={option.value} value={option.value} className="px-2 text-xs sm:px-3 sm:text-sm">
               {option.label}
             </TabsTrigger>
           ))}
@@ -670,6 +959,7 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
             blocks={blocks}
             onChange={(sections) => setComposerSections(sections)}
             onGenerate={handleGeneratePrompt}
+            onApplyToChat={handleApplyToChat}
           />
           <Card className="border-border/60">
             <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -700,11 +990,11 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
               </p>
             </CardContent>
           </Card>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-muted-foreground">
               전환 시점에 맞춰 활성화할 프롬프트 블록을 빠르게 조합할 수 있습니다.
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="ghost" onClick={handleClearAll}>
                 전체 초기화
               </Button>
@@ -748,6 +1038,7 @@ export const PromptWorkspace = ({ onClose }: PromptWorkspaceProps) => {
                         usePromptStore.getState().setActiveForCategory(block.category, block.id);
                       }}
                       onEdit={() => handleEditBlock(block.id)}
+                      onDuplicate={() => handleDuplicateBlock(block.id)}
                       onDelete={() => handleDeleteBlock(block.id)}
                     />
                   ))

@@ -1,32 +1,56 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { Message } from "@/components/ChatMessage";
-import { Conversation } from "@/components/ConversationList";
+import { Conversation, ConversationWorkspace } from "@/components/ConversationList";
 import { Insight } from "@/components/InsightCard";
 
 interface ChatState {
   conversations: Conversation[];
+  workspaces: ConversationWorkspace[];
   messages: Record<string, Message[]>;
   insights: Insight[];
   activeConversationId: string | null;
 
   addConversation: (opts?: { mode?: "GUIDED" | "CUSTOM"; customPrompt?: string; personaTitle?: string }) => string;
+  deleteConversation: (conversationId: string) => void;
   addMessage: (conversationId: string, message: Omit<Message, "id" | "timestamp">) => void;
   updateMessage: (conversationId: string, messageId: string, patch: Partial<Message>) => void;
   saveInsight: (conversationId: string, messageId: string) => void;
   deleteInsight: (insightId: string) => void;
   updateInsightNote: (insightId: string, note: string) => void;
+  createWorkspace: (opts: { name?: string; conversationIds: string[] }) => string | null;
+  renameWorkspace: (workspaceId: string, name: string) => void;
+  deleteWorkspace: (workspaceId: string, preserveConversations?: boolean) => void;
+  moveConversationsToWorkspace: (conversationIds: string[], workspaceId: string | null) => void;
+  toggleWorkspaceCollapsed: (workspaceId: string) => void;
   setActiveConversation: (id: string | null) => void;
   getActiveMessages: () => Message[];
   getActiveConversation: () => Conversation | undefined;
-  setConversationSession: (conversationId: string, sessionId: string) => void;
   updateConversation: (conversationId: string, patch: Partial<Conversation>) => void;
 }
+
+const createWorkspaceId = () =>
+  `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const normalizeConversationIds = (conversations: Conversation[], ids: string[]) => {
+  const conversationSet = new Set(conversations.map((conversation) => conversation.id));
+  const seen = new Set<string>();
+  const orderMap = new Map(conversations.map((conversation, index) => [conversation.id, index]));
+
+  return ids
+    .filter((id) => {
+      if (!conversationSet.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .sort((a, b) => (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0));
+};
 
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
       conversations: [],
+      workspaces: [],
       messages: {},
       insights: [],
       activeConversationId: null,
@@ -45,6 +69,7 @@ export const useChatStore = create<ChatState>()(
           mode,
           personaTitle,
           customPrompt,
+          workspaceId: null,
         };
         set((state) => ({
           conversations: [newConversation, ...state.conversations],
@@ -52,6 +77,39 @@ export const useChatStore = create<ChatState>()(
           activeConversationId: id,
         }));
         return id;
+      },
+
+      deleteConversation: (conversationId) => {
+        set((state) => {
+          const targetExists = state.conversations.some((conversation) => conversation.id === conversationId);
+          if (!targetExists) return state;
+
+          const nextConversations = state.conversations.filter(
+            (conversation) => conversation.id !== conversationId
+          );
+
+          const { [conversationId]: _removedMessages, ...nextMessages } = state.messages;
+          const nextInsights = state.insights.filter((insight) => insight.conversationId !== conversationId);
+          const nextWorkspaces = state.workspaces
+            .map((workspace) => ({
+              ...workspace,
+              conversationIds: workspace.conversationIds.filter((id) => id !== conversationId),
+            }))
+            .filter((workspace) => workspace.conversationIds.length > 0);
+
+          const nextActiveConversationId =
+            state.activeConversationId === conversationId
+              ? nextConversations[0]?.id ?? null
+              : state.activeConversationId;
+
+          return {
+            conversations: nextConversations,
+            messages: nextMessages,
+            insights: nextInsights,
+            workspaces: nextWorkspaces,
+            activeConversationId: nextActiveConversationId,
+          };
+        });
       },
 
       addMessage: (conversationId, message) => {
@@ -173,6 +231,153 @@ export const useChatStore = create<ChatState>()(
         }));
       },
 
+      createWorkspace: ({ name, conversationIds }) => {
+        const normalizedName = name?.trim();
+        const currentConversations = get().conversations;
+        const ids = normalizeConversationIds(currentConversations, conversationIds);
+        if (ids.length === 0) return null;
+
+        const workspaceId = createWorkspaceId();
+
+        set((state) => {
+          const detachedWorkspaces = state.workspaces
+            .map((workspace) => ({
+              ...workspace,
+              conversationIds: workspace.conversationIds.filter((id) => !ids.includes(id)),
+            }))
+            .filter((workspace) => workspace.conversationIds.length > 0);
+
+          const workspaceName =
+            normalizedName && normalizedName.length > 0
+              ? normalizedName
+              : `워크스페이스 ${detachedWorkspaces.length + 1}`;
+
+          const workspace: ConversationWorkspace = {
+            id: workspaceId,
+            name: workspaceName,
+            conversationIds: ids,
+            createdAt: new Date(),
+            collapsed: false,
+          };
+
+          const nextConversations = state.conversations.map((conversation) =>
+            ids.includes(conversation.id)
+              ? { ...conversation, workspaceId }
+              : conversation
+          );
+
+          return {
+            conversations: nextConversations,
+            workspaces: [workspace, ...detachedWorkspaces],
+          };
+        });
+
+        return workspaceId;
+      },
+
+      renameWorkspace: (workspaceId, name) => {
+        const nextName = name.trim();
+        if (!nextName) return;
+
+        set((state) => ({
+          workspaces: state.workspaces.map((workspace) =>
+            workspace.id === workspaceId ? { ...workspace, name: nextName } : workspace
+          ),
+        }));
+      },
+
+      deleteWorkspace: (workspaceId, preserveConversations = true) => {
+        set((state) => {
+          const workspace = state.workspaces.find((item) => item.id === workspaceId);
+          if (!workspace) return state;
+
+          if (preserveConversations) {
+            return {
+              workspaces: state.workspaces.filter((item) => item.id !== workspaceId),
+              conversations: state.conversations.map((conversation) =>
+                conversation.workspaceId === workspaceId
+                  ? { ...conversation, workspaceId: null }
+                  : conversation
+              ),
+            };
+          }
+
+          const toDelete = new Set(workspace.conversationIds);
+          const nextConversations = state.conversations.filter((conversation) => !toDelete.has(conversation.id));
+          const nextMessages = Object.fromEntries(
+            Object.entries(state.messages).filter(([conversationId]) => !toDelete.has(conversationId))
+          );
+          const nextInsights = state.insights.filter((insight) => !toDelete.has(insight.conversationId ?? ""));
+          const nextActiveConversationId =
+            state.activeConversationId && toDelete.has(state.activeConversationId)
+              ? nextConversations[0]?.id ?? null
+              : state.activeConversationId;
+
+          return {
+            workspaces: state.workspaces.filter((item) => item.id !== workspaceId),
+            conversations: nextConversations,
+            messages: nextMessages,
+            insights: nextInsights,
+            activeConversationId: nextActiveConversationId,
+          };
+        });
+      },
+
+      moveConversationsToWorkspace: (conversationIds, workspaceId) => {
+        set((state) => {
+          const ids = normalizeConversationIds(state.conversations, conversationIds);
+          if (ids.length === 0) return state;
+
+          const hasTargetWorkspace =
+            workspaceId == null || state.workspaces.some((workspace) => workspace.id === workspaceId);
+          if (!hasTargetWorkspace) return state;
+
+          const idSet = new Set(ids);
+          const strippedWorkspaces = state.workspaces
+            .map((workspace) => ({
+              ...workspace,
+              conversationIds: workspace.conversationIds.filter((id) => !idSet.has(id)),
+            }))
+            .filter((workspace) => workspace.conversationIds.length > 0 || workspace.id === workspaceId);
+
+          const nextWorkspaces =
+            workspaceId == null
+              ? strippedWorkspaces.filter((workspace) => workspace.conversationIds.length > 0)
+              : strippedWorkspaces.map((workspace) =>
+                  workspace.id === workspaceId
+                    ? {
+                        ...workspace,
+                        conversationIds: [
+                          ...ids,
+                          ...workspace.conversationIds.filter((id) => !idSet.has(id)),
+                        ],
+                      }
+                    : workspace
+                );
+
+          const nextConversations = state.conversations.map((conversation) =>
+            idSet.has(conversation.id)
+              ? { ...conversation, workspaceId: workspaceId ?? null }
+              : conversation
+          );
+
+          return {
+            workspaces: nextWorkspaces,
+            conversations: nextConversations,
+          };
+        });
+      },
+
+      toggleWorkspaceCollapsed: (workspaceId) => {
+        set((state) => ({
+          workspaces: state.workspaces.map((workspace) =>
+            workspace.id === workspaceId
+              ? { ...workspace, collapsed: !workspace.collapsed }
+              : workspace
+          ),
+        }));
+      },
+
       setActiveConversation: (id) => {
         set({ activeConversationId: id });
       },
@@ -187,14 +392,6 @@ export const useChatStore = create<ChatState>()(
         const state = get();
         if (!state.activeConversationId) return undefined;
         return state.conversations.find((c) => c.id === state.activeConversationId);
-      },
-
-      setConversationSession: (conversationId, sessionId) => {
-        set((state) => ({
-          conversations: state.conversations.map((c) =>
-            c.id === conversationId ? { ...c, sessionId } : c
-          ),
-        }));
       },
 
       updateConversation: (conversationId, patch) => {

@@ -22,6 +22,7 @@ export default defineConfig((configEnv) => {
       },
     },
     build: {
+      chunkSizeWarningLimit: 700,
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -40,6 +41,12 @@ export default defineConfig((configEnv) => {
               }
               if (id.includes("zustand") || id.includes("clsx") || id.includes("tailwind-merge")) {
                 return "vendor-utils";
+              }
+              if (id.includes("react-syntax-highlighter") || id.includes("highlight.js") || id.includes("prismjs")) {
+                return "vendor-highlight";
+              }
+              if (id.includes("react-markdown") || id.includes("remark") || id.includes("rehype") || id.includes("micromark") || id.includes("mdast") || id.includes("hast") || id.includes("unified")) {
+                return "vendor-markdown";
               }
             }
           },

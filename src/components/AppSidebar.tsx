@@ -1,4 +1,4 @@
-import { Sparkles, Star, MessageSquare, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -13,24 +13,44 @@ import {
   useSidebar,
 } from "./ui/sidebar";
 import { Button } from "./ui/button";
-import { ConversationList, Conversation } from "./ConversationList";
+import { ConversationList, Conversation, ConversationWorkspace } from "./ConversationList";
 import { Switch } from "./ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useSettingsStore } from "@/hooks/useSettingsStore";
 import { cn } from "@/lib/utils";
+import {
+  DialogOrbitIcon,
+  InsightPrismIcon,
+  MindMirrorMark,
+  PromptCircuitIcon,
+} from "@/components/icons/AgenticIcons";
 
 interface AppSidebarProps {
   conversations: Conversation[];
+  workspaces?: ConversationWorkspace[];
   activeConversationId?: string;
   onSelectConversation: (id: string) => void;
+  onDeleteConversation?: (id: string) => void;
   onNewConversation: () => void;
+  onCreateWorkspace?: (conversationIds: string[]) => void;
+  onMoveToWorkspace?: (conversationIds: string[], workspaceId: string | null) => void;
+  onToggleWorkspace?: (workspaceId: string) => void;
+  onRenameWorkspace?: (workspaceId: string, name: string) => void;
+  onDeleteWorkspace?: (workspaceId: string) => void;
 }
 
 export const AppSidebar = ({
   conversations,
+  workspaces,
   activeConversationId,
   onSelectConversation,
+  onDeleteConversation,
   onNewConversation,
+  onCreateWorkspace,
+  onMoveToWorkspace,
+  onToggleWorkspace,
+  onRenameWorkspace,
+  onDeleteWorkspace,
 }: AppSidebarProps) => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -38,13 +58,13 @@ export const AppSidebar = ({
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-72"} collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+      <SidebarHeader className="h-[4.75rem] justify-center border-b border-sidebar-border px-4 py-0">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-10 h-10 rounded-xl bg-primary/[0.15] flex items-center justify-center flex-shrink-0"
+          <div
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/[0.15]"
             aria-hidden="true"
           >
-            <Sparkles className="h-5 w-5 text-primary" />
+            <MindMirrorMark className="h-5 w-5 text-primary" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
@@ -76,7 +96,7 @@ export const AppSidebar = ({
                       )
                     }
                   >
-                    <MessageSquare className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    <DialogOrbitIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     {!collapsed && <span>대화</span>}
                   </NavLink>
                 </SidebarMenuButton>
@@ -94,8 +114,26 @@ export const AppSidebar = ({
                       )
                     }
                   >
-                    <Star className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    <InsightPrismIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     {!collapsed && <span>나의 통찰</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/prompt-studio"
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                        isActive 
+                          ? "bg-accent/[0.12] text-accent font-medium" 
+                          : "text-foreground/80 hover:bg-sidebar-accent hover:text-foreground"
+                      )
+                    }
+                  >
+                    <PromptCircuitIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    {!collapsed && <span>프롬프트 스튜디오</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -111,8 +149,15 @@ export const AppSidebar = ({
             <SidebarGroupContent className="h-full overflow-hidden">
               <ConversationList
                 conversations={conversations}
+                workspaces={workspaces}
                 activeId={activeConversationId}
                 onSelect={onSelectConversation}
+                onDelete={onDeleteConversation}
+                onCreateWorkspace={onCreateWorkspace}
+                onMoveToWorkspace={onMoveToWorkspace}
+                onToggleWorkspace={onToggleWorkspace}
+                onRenameWorkspace={onRenameWorkspace}
+                onDeleteWorkspace={onDeleteWorkspace}
               />
             </SidebarGroupContent>
           </SidebarGroup>

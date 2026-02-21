@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { MessageSquare, Trash2, Edit3, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Textarea } from "./ui/textarea";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+const MarkdownRenderer = lazy(() => import("@/components/MarkdownRenderer"));
 import { cn } from "@/lib/utils";
 
 export interface Insight {
@@ -78,10 +78,12 @@ export const InsightCard = ({
             )}
           >
             <div className="p-4">
-              <MarkdownRenderer 
-                content={insight.content} 
-                className="text-sm leading-relaxed text-foreground/90" 
-              />
+              <Suspense fallback={<p className="text-sm leading-relaxed text-foreground/90 animate-pulse">{insight.content}</p>}>
+                <MarkdownRenderer 
+                  content={insight.content} 
+                  className="text-sm leading-relaxed text-foreground/90" 
+                />
+              </Suspense>
             </div>
           </div>
           
