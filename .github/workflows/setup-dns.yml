@@ -1,0 +1,111 @@
+name: Setup Cloudflare DNS for Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      subdomain:
+        description: 'Subdomain to create (e.g. ai-failure)'
+        required: true
+        default: 'ai-failure'
+      zone_name:
+        description: 'Zone name (e.g. nodove.com)'
+        required: true
+        default: 'nodove.com'
+
+jobs:
+  setup-dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Zone ID
+        id: zone
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          ZONE_ID=$(curl -s -X GET \
+            "https://api.cloudflare.com/client/v4/zones?name=${{ github.event.inputs.zone_name }}" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            | jq -r '.result[0].id')
+          echo "zone_id=$ZONE_ID" >> $GITHUB_OUTPUT
+          echo "Zone ID: $ZONE_ID"
+
+      - name: Check existing DNS record
+        id: check
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          EXISTING=$(curl -s -X GET \
+            "https://api.cloudflare.com/client/v4/zones/${{ steps.zone.outputs.zone_id }}/dns_records?name=${{ github.event.inputs.subdomain }}.${{ github.event.inputs.zone_name }}" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json")
+          COUNT=$(echo "$EXISTING" | jq '.result | length')
+          echo "existing_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Existing records: $COUNT"
+          echo "$EXISTING" | jq '.result[] | {id, type, name, content, proxied}' || true
+
+      - name: Create DNS record (AAAA, Proxied)
+        if: steps.check.outputs.existing_count == '0'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          RESULT=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${{ steps.zone.outputs.zone_id }}/dns_records" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "type": "AAAA",
+              "name": "${{ github.event.inputs.subdomain }}",
+              "content": "100::",
+              "proxied": true,
+              "comment": "Dummy record for Cloudflare Worker route - proxied traffic handled by Worker"
+            }')
+          echo "$RESULT" | jq '.'
+          SUCCESS=$(echo "$RESULT" | jq '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Failed to create DNS record"
+            exit 1
+          fi
+          echo "DNS record created successfully"
+
+      - name: Update existing record to Proxied
+        if: steps.check.outputs.existing_count != '0'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          RECORD_ID=$(curl -s -X GET \
+            "https://api.cloudflare.com/client/v4/zones/${{ steps.zone.outputs.zone_id }}/dns_records?name=${{ github.event.inputs.subdomain }}.${{ github.event.inputs.zone_name }}" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            | jq -r '.result[0].id')
+          echo "Updating record ID: $RECORD_ID"
+          RESULT=$(curl -s -X PATCH \
+            "https://api.cloudflare.com/client/v4/zones/${{ steps.zone.outputs.zone_id }}/dns_records/$RECORD_ID" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"proxied": true}')
+          echo "$RESULT" | jq '.'
+
+      - name: Verify DNS propagation
+        run: |
+          echo "Waiting 5s for DNS propagation..."
+          sleep 5
+          dig ${{ github.event.inputs.subdomain }}.${{ github.event.inputs.zone_name }} A +short || true
+          dig ${{ github.event.inputs.subdomain }}.${{ github.event.inputs.zone_name }} AAAA +short || true
+          echo "If empty above, DNS may take up to 60s to propagate"
+
+      - name: Test Worker endpoint
+        run: |
+          sleep 10
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X OPTIONS \
+            -H "Origin: https://ai-failure-chat.nodove.com" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: authorization,content-type" \
+            "https://${{ github.event.inputs.subdomain }}.${{ github.event.inputs.zone_name }}/v1/chat/completions" \
+            --max-time 15 2>/dev/null || echo "000")
+          echo "OPTIONS preflight HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "CORS preflight SUCCESS"
+          else
+            echo "CORS preflight returned $HTTP_CODE - DNS may still be propagating"
+          fi
